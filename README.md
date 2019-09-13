@@ -25,7 +25,7 @@ In this project, we are going to build a discrete-time event simulator for a num
 
 ## Licensing & Thanks
 
-These scripts are released under the [MIT License][mit].
+This project is released under the [MIT License][mit].
 
 ## Changelog
 
