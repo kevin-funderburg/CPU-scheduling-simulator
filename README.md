@@ -30,3 +30,5 @@ These scripts are released under the [MIT License][mit].
 ## Changelog
 
 - v1.0.0
+
+[mit]: https://github.com/kevin-funderburg/discrete-time-event-simulator/blob/master/LICENSE.txt
