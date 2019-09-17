@@ -80,3 +80,5 @@ workspace.xml
 tasks.xml
 .idea
 .iml%
+cmake-build-debug
+CMakeLists.txt
