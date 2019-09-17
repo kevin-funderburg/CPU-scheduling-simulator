@@ -1,10 +1,18 @@
+/***
+ * CPU Scheduler Simulation
+ * Authors: Kevin Funderburg, Rob Murrat
+ */
+/////////////////////////////////////////////////
+// TODO - Add a Process Ready Queue
+// ASKPROF - can we use priority queue from stdlib?
+/////////////////////////////////////////////////
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
 //#include <ctime>
 using namespace std;
 
-#define SIZE 10000
+#define SIZE 10
 ////////////////////////////////////////////////////////////////
 // TODO - need to clarify these events
 #define ARRIVE 1
@@ -19,8 +27,7 @@ enum State {NEW = 1, READY = 2, WAITING = 3, RUNNING = 4, TERMINATED = 5};
 struct event{
     float time;
     int   type;
-    int   priority;
-    int   burst;
+    float   burst;  // service time
     struct event* next;
 };
 
@@ -31,11 +38,14 @@ int run_sim();
 void generate_report();
 int schedule_event(struct event*);
 int delete_event(struct event* eve);
+float urand();
+float genexp(float);
 int process_event2(struct event* eve);
 
 ////////////////////////////////////////////////////////////////
 //Global variables
-struct event* head; // head of event queue
+event* head; // head of event queue
+event* readyq;
 float _clock; // simulation clock, added underscore to make unique from system clock
 int process_count;
 
@@ -44,9 +54,31 @@ void init()
 {
     // initialize all variables, states, and end conditions
     head = new event;
-    head->time = 0.0;
+
+    ///
+    /// NOTE - not sure if this can be an array when initializing or a linked list
+    /// so this is commented out below, but we may use it
+
     event processes[SIZE];
-    process_count = 0;    // end condition, ends when it equals 10000
+    for (int i = 0; i < SIZE; ++i) {
+        processes[i].time = i;
+        processes[i].burst = genexp(0.06);
+    }
+
+    ////
+    //// This is creating the processes in a linked list
+    ////
+//    event *cursor;
+//    cursor = head;
+//    for (int i = 0; i < SIZE; ++i) {
+//        cursor->time = i;
+//        cursor->burst = genexp(0.06);
+//        cursor->next = new event;
+//        cursor = cursor->next;
+//    }
+//    cursor->next = nullptr;
+
+
     // schedule first events
     schedule_event(head);
 }
@@ -98,7 +130,7 @@ int run_sim()
 {
     event *eve;
 //    while (!end_condition)
-    while(process_count < 10000)
+    while(head->next != nullptr)
     {
         eve = head;
         cout << "eve->time: " << eve->time << endl;
@@ -106,6 +138,7 @@ int run_sim()
         switch (eve->type)
         {
             case ARRIVE:
+                // this might need to enqueue the event
                 schedule_event(eve);
                 break;
             case COMPLETE:
