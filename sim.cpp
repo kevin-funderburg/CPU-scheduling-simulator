@@ -1,9 +1,13 @@
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
+#include <ctime>
+
+using namespace std;
 
 ////////////////////////////////////////////////////////////////
 // sample events
+/// TODO - need to define what kind of events there are
 #define EVENT1 1
 #define EVENT2 2
 // .. add more events
@@ -12,6 +16,7 @@
 struct event{
     float time;
     int   type;
+    int
     // add more fields
     struct event* next;
 };
@@ -29,12 +34,17 @@ int process_event2(struct event* eve);
 //Global variables
 struct event* head; // head of event queue
 float clock; // simulation clock
+int end_condition;
 
 ////////////////////////////////////////////////////////////////
 void init()
 {
     // initialize all variables, states, and end conditions
+    head->time = clock = 0.0;   // set queue time and clock to 0
+    end_condition = 10000;      // 10000 processes
+
     // schedule first events
+    schedule_event(head);
 }
 ////////////////////////////////////////////////////////////////
 void generate_report()
@@ -42,7 +52,7 @@ void generate_report()
     // output statistics
 }
 //////////////////////////////////////////////////////////////// //schedules an event in the future
-int schedule_event(struct event* new)
+int schedule_event(struct event*)
 {
 // insert event in the event queue in its order of time
 }
@@ -85,14 +95,25 @@ int run_sim()
                 // add more events
 
             default:
-                // error
+                cerr << "invalid event type";   // error
         }
 
         head = eve->next;
-        free(eve);
+        delete eve;
         eve = NULL;
     }
     return 0;
+}
+
+int process_event1(struct event* eve)
+{
+    // need to hae arrival time
+    return 0;   // PLACEHOLDER
+}
+
+int process_event2(struct event* eve)
+{
+    return 0;   // PLACEHOLDER
 }
 ////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[] )
