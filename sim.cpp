@@ -39,7 +39,7 @@ int end_condition;
 void init()
 {
     // initialize all variables, states, and end conditions
-    head->time = 0.0;   // set queue time and clock to 0
+//    head->time = 0.0;   // set queue time and clock to 0
     end_condition = 10000;      // 10000 processes
 
     // schedule first events
@@ -54,6 +54,7 @@ void generate_report()
 int schedule_event(struct event*)
 {
 // insert event in the event queue in its order of time
+    return 0;
 }
 ////////////////////////////////////////////////////////////////
 // returns a random number between 0 and 1
@@ -80,6 +81,7 @@ int run_sim()
     struct event* eve;
     while (!end_condition)
     {
+        cout << "looping\n";
         eve = head;
         _clock = eve->time;
         switch (eve->type)
@@ -117,10 +119,10 @@ int process_event2(struct event* eve)
 ////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[] )
 {
-    cout << "starting";
-    if (argc < 1)
+    clog << "starting\n";
+    if (argc == 1)
     {
-        cerr << "[123] [average arrival rate] [average service time] [quantum interval]\n\n"
+        cerr << "sim [123] [average arrival rate] [average service time] [quantum interval]\n\n"
              << "1 : FCFS\n"
              << "2 : SRTF\n"
              << "3 : RR";

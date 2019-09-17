@@ -59,6 +59,12 @@ typings/
 # next.js build output
 .next
 
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
 #############
 # Mac Files #
 #############
