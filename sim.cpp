@@ -1,10 +1,10 @@
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
-#include <ctime>
+//#include <ctime>
 
 using namespace std;
-
+// TODO - add states of the CPU to the system
 ////////////////////////////////////////////////////////////////
 // sample events
 /// TODO - need to define what kind of events there are
@@ -16,7 +16,6 @@ using namespace std;
 struct event{
     float time;
     int   type;
-    int
     // add more fields
     struct event* next;
 };
@@ -33,14 +32,14 @@ int process_event2(struct event* eve);
 ////////////////////////////////////////////////////////////////
 //Global variables
 struct event* head; // head of event queue
-float clock; // simulation clock
+float _clock; // simulation clock, added underscore to make unique from system clock
 int end_condition;
 
 ////////////////////////////////////////////////////////////////
 void init()
 {
     // initialize all variables, states, and end conditions
-    head->time = clock = 0.0;   // set queue time and clock to 0
+    head->time = 0.0;   // set queue time and clock to 0
     end_condition = 10000;      // 10000 processes
 
     // schedule first events
@@ -82,7 +81,7 @@ int run_sim()
     while (!end_condition)
     {
         eve = head;
-        clock = eve->time;
+        _clock = eve->time;
         switch (eve->type)
         {
             case EVENT1:
@@ -107,7 +106,7 @@ int run_sim()
 
 int process_event1(struct event* eve)
 {
-    // need to hae arrival time
+    // need to have arrival time
     return 0;   // PLACEHOLDER
 }
 
@@ -118,7 +117,14 @@ int process_event2(struct event* eve)
 ////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[] )
 {
-    // parse arguments
+    cout << "starting";
+    if (argc < 1)
+    {
+        cerr << "[123] [average arrival rate] [average service time] [quantum interval]\n\n"
+             << "1 : FCFS\n"
+             << "2 : SRTF\n"
+             << "3 : RR";
+    }
     init();
     run_sim();
     generate_report();
