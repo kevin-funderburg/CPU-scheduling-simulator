@@ -5,6 +5,7 @@
 /////////////////////////////////////////////////
 // TODO - Add a Process Ready Queue
 // ASKPROF - can we use priority queue from stdlib?
+// Use 105 ms for the preemptive SRTF
 /////////////////////////////////////////////////
 #include <iostream>
 #include <cstdlib>
@@ -16,7 +17,9 @@ using namespace std;
 ////////////////////////////////////////////////////////////////
 // TODO - need to clarify these events
 #define ARRIVE 1
-#define COMPLETE 2
+#define EXECUTING 2
+#define DEPARTURE 3     // occurs when using algo 2, the process has used all its CPU time and is added back to the ready queue
+#define COMPLETE 4
 #define SLICE 3
 
 // .. add more events
@@ -27,8 +30,18 @@ enum State {NEW = 1, READY = 2, WAITING = 3, RUNNING = 4, TERMINATED = 5};
 struct event{
     float time;
     int   type;
+    float remainingTime;
     float   burst;  // service time
     struct event* next;
+};
+
+struct process {
+    int pid;            // process ID
+    int time;           // arrival time
+    int burst;          // service time
+    State state;        // process state
+    int remainingTime;  // time left for execution
+    // add stats
 };
 
 ////////////////////////////////////////////////////////////////
@@ -58,7 +71,8 @@ void init()
     ///
     /// NOTE - not sure if this can be an array when initializing or a linked list
     /// so this is commented out below, but we may use it
-
+// add a process ID
+// process arrives at a certain time
     event processes[SIZE];
     for (int i = 0; i < SIZE; ++i) {
         processes[i].time = i;
@@ -68,15 +82,15 @@ void init()
     ////
     //// This is creating the processes in a linked list
     ////
-//    event *cursor;
-//    cursor = head;
-//    for (int i = 0; i < SIZE; ++i) {
-//        cursor->time = i;
-//        cursor->burst = genexp(0.06);
-//        cursor->next = new event;
-//        cursor = cursor->next;
-//    }
-//    cursor->next = nullptr;
+    event *cursor;
+    cursor = head;
+    for (int i = 0; i < SIZE; ++i) {
+        cursor->time = i;
+        cursor->burst = genexp(0.06);
+        cursor->next = new event;
+        cursor = cursor->next;
+    }
+    cursor->next = nullptr;
 
 
     // schedule first events
@@ -106,6 +120,8 @@ int delete_event(event *eve)
 {
     return 0;
 }
+
+
 ////////////////////////////////////////////////////////////////
 // returns a random number between 0 and 1
 float urand()
@@ -144,7 +160,9 @@ int run_sim()
             case COMPLETE:
                 delete_event(eve);
                 break;
-
+            case DEPARTURE:
+                // do something
+                break;
                 // add more events
 
             default:
@@ -188,7 +206,7 @@ int main(int argc, char *argv[] )
         return 1;
     }
     int scheduler = stoi(argv[1]);
-    int lambda = stoi(argv[2]);
+    float lambda = 1 / (stoi(argv[2]));   // 1 / argument is the arrival process time
     float avgServiceTime = stof(argv[3]);
     if (argc == 5)
         float quantum = stof(argv[4]);

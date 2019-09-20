@@ -3,7 +3,7 @@ sim: sim.o
 sim.o: sim.cpp
      g++ -Wall -ansi -pedantic -std=c++11 -c sim.cpp
 go:
-	./sim
+	./sim 1 5 0.06 0.01
 clean:
 	@rm -rf sim.o
 cleanall:
