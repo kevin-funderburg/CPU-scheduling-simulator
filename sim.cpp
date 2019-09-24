@@ -10,30 +10,25 @@
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
-//#include <ctime>
+
+#include "event.h"
+#include "list.h"
+
 using namespace std;
 
 #define SIZE 10
 ////////////////////////////////////////////////////////////////
 // TODO - need to clarify these events
-#define ARRIVE 1
-#define EXECUTING 2
-#define DEPARTURE 3     // occurs when using algo 2, the process has used all its CPU time and is added back to the ready queue
-#define COMPLETE 4
-#define SLICE 3
+#define ARRIVAL 0
+#define TIMESLICE 1
+#define DEPARTURE 2     // occurs when using algo 2, the process has used all its CPU time and is added back to the ready queue
 
 // .. add more events
 // NOTE - not sure if this is the best way
 enum State {NEW = 1, READY = 2, WAITING = 3, RUNNING = 4, TERMINATED = 5};
 
 ////////////////////////////////////////////////////////////////     //event structure
-struct event{
-    float time;
-    int   type;
-    float remainingTime;
-    float   burst;  // service time
-    struct event* next;
-};
+
 
 struct process {
     int pid;            // process ID
@@ -60,14 +55,15 @@ int process_event2(struct event* eve);
 event* head; // head of event queue
 event* readyq;
 float _clock; // simulation clock, added underscore to make unique from system clock
-int process_count;
+//int process_count;
 
 ////////////////////////////////////////////////////////////////
 void init()
 {
     // initialize all variables, states, and end conditions
     head = new event;
-
+    head->time = 0;
+    head->type = ARRIVAL;
     ///
     /// NOTE - not sure if this can be an array when initializing or a linked list
     /// so this is commented out below, but we may use it
@@ -105,13 +101,39 @@ void generate_report()
 int schedule_event(event *newEvent)
 {
     // insert event in the event queue in its order of time
-    event* temp;
-    temp = head;
 
-    // this appends to the list, not sure if that's what's needed
+    /**
+     * This is supposed to add an event to the queue based on the time
+     * It still needs work
+    event* cursor;
+    cursor = head;
+
+    bool inserted = false;
+
+    if (head == nullptr)
+        head = new event;
+    while (!inserted) {
+        if (cursor->time < newEvent->time)
+        {
+            if (cursor->next == nullptr) {  // list length is 1
+                cursor->next = newEvent;
+                return 0;
+            }
+            else if (cursor->next->time > newEvent->time)
+            {
+                event* temp = new event;
+            }
+        }
+    }
+     **/
+     event *temp = new event;
+     temp = head;
+    // this appends the new even to the queue, needs to be adjusted for priority,
     newEvent->next = nullptr;
     while(temp->next != nullptr)
+    {
         temp = temp->next;
+    }
     temp->next = newEvent;
     return 0;
 }
@@ -145,19 +167,25 @@ float genexp(float lambda)
 int run_sim()
 {
     event *eve;
-//    while (!end_condition)
-    while(head->next != nullptr)
+    int process_count = 0;
+    process process_table[SIZE];
+    while (process_count < SIZE)
+//    while(head->next != nullptr)
     {
         eve = head;
         cout << "eve->time: " << eve->time << endl;
         _clock = eve->time;
         switch (eve->type)
         {
-            case ARRIVE:
-                // this might need to enqueue the event
+            case ARRIVAL:
+                process_table[process_count].pid = process_count;
+                process_table[process_count].time = process_count;
+                process_table[process_count].burst = genexp(0.06);
+                process_table[process_count].state = NEW;
+                process_table[process_count].remainingTime = process_table[process_count].time;
                 schedule_event(eve);
                 break;
-            case COMPLETE:
+            case TIMESLICE:
                 delete_event(eve);
                 break;
             case DEPARTURE:
