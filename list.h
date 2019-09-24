@@ -13,7 +13,7 @@ struct node {
 
 // insert and delete operations.
 void insert(struct node **head, event *event);
-void delete(struct node **head, event *event);
+void deleteNode(struct node **head, event *event);
 void traverse(struct node *head);
 
 

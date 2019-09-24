@@ -48,6 +48,7 @@ int schedule_event(struct event*);
 int delete_event(struct event* eve);
 float urand();
 float genexp(float);
+process newProcess(int);
 int process_event2(struct event* eve);
 
 ////////////////////////////////////////////////////////////////
@@ -64,33 +65,33 @@ void init()
     head = new event;
     head->time = 0;
     head->type = ARRIVAL;
-    ///
-    /// NOTE - not sure if this can be an array when initializing or a linked list
-    /// so this is commented out below, but we may use it
-// add a process ID
-// process arrives at a certain time
-    event processes[SIZE];
-    for (int i = 0; i < SIZE; ++i) {
-        processes[i].time = i;
-        processes[i].burst = genexp(0.06);
-    }
+    head->next = nullptr;
+//    ///
+//    /// NOTE - not sure if this can be an array when initializing or a linked list
+//    /// so this is commented out below, but we may use it
+//// add a process ID
+//// process arrives at a certain time
+//    event processes[SIZE];
+//    for (int i = 0; i < SIZE; ++i) {
+//        processes[i].time = i;
+//        processes[i].burst = genexp(0.06);
+//    }
 
     ////
     //// This is creating the processes in a linked list
     ////
-    event *cursor;
-    cursor = head;
-    for (int i = 0; i < SIZE; ++i) {
-        cursor->time = i;
-        cursor->burst = genexp(0.06);
-        cursor->next = new event;
-        cursor = cursor->next;
-    }
-    cursor->next = nullptr;
-
+//    event *cursor;
+//    cursor = head;
+//    for (int i = 0; i < SIZE; ++i) {
+//        cursor->time = i;
+//        cursor->burst = genexp(0.06);
+//        cursor->next = new event;
+//        cursor = cursor->next;
+//    }
+//    cursor->next = nullptr;
 
     // schedule first events
-    schedule_event(head);
+//    schedule_event(head);
 }
 ////////////////////////////////////////////////////////////////
 void generate_report()
@@ -126,12 +127,10 @@ int schedule_event(event *newEvent)
         }
     }
      **/
-     event *temp = new event;
-     temp = head;
+    event *temp = head;
     // this appends the new even to the queue, needs to be adjusted for priority,
     newEvent->next = nullptr;
-    while(temp->next != nullptr)
-    {
+    while (temp->next != nullptr) {
         temp = temp->next;
     }
     temp->next = newEvent;
@@ -167,10 +166,9 @@ float genexp(float lambda)
 int run_sim()
 {
     event *eve;
-    int process_count = 0;
-    process process_table[SIZE];
-    while (process_count < SIZE)
-//    while(head->next != nullptr)
+    int p_count = 0;
+    process p_table[SIZE];
+    while (p_count < SIZE)
     {
         eve = head;
         cout << "eve->time: " << eve->time << endl;
@@ -178,20 +176,32 @@ int run_sim()
         switch (eve->type)
         {
             case ARRIVAL:
-                process_table[process_count].pid = process_count;
-                process_table[process_count].time = process_count;
-                process_table[process_count].burst = genexp(0.06);
-                process_table[process_count].state = NEW;
-                process_table[process_count].remainingTime = process_table[process_count].time;
-                schedule_event(eve);
+                p_table[p_count] = newProcess(p_count);     // add new process to process table
+                eve->pid = p_table[p_count].pid;
+                event *newEvent;    // schedule next arrival
+                newEvent = new event;
+                newEvent->time = eve->time + 3;    // i put 3 here but this should be random i think
+                schedule_event(newEvent);
                 break;
             case TIMESLICE:
-                delete_event(eve);
+                // under FCFS, we know exactly when this process would finish, so we can schedule a
+                // completion event in the future and place it in the Event Queue
+                p_table[eve->pid].state = TERMINATED;
+                p_table[eve->pid].remainingTime = 0;
+                eve->time = _clock + p_table[eve->pid].burst;
+                eve->type = DEPARTURE;
+                schedule_event(eve);
                 break;
             case DEPARTURE:
-                // do something
+                if (p_table[eve->pid].remainingTime == 0)
+                {
+                    p_table[eve->pid].state = TERMINATED;
+                    delete_event(eve);
+                } else {
+                    p_table[eve->pid].state = READY;
+                    schedule_event(eve);
+                }
                 break;
-                // add more events
 
             default:
                 cerr << "invalid event type\n";   // error
@@ -200,11 +210,20 @@ int run_sim()
         head = eve->next;
         delete eve;
         eve = nullptr;
-        process_count++;
+        p_count++;
     }
     return 0;
 }
 
+process newProcess(int index)
+{
+    process p;
+    p.pid = index;
+    p.time = index;
+    p.burst = p.remainingTime = genexp(0.06);
+    p.state = NEW;
+    return p;
+}
 
 int process_event2(struct event* eve)
 {
