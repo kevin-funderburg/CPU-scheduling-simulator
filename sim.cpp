@@ -23,8 +23,6 @@ using namespace std;
 #define TIMESLICE 1
 #define DEPARTURE 2     // occurs when using algo 2, the process has used all its CPU time and is added back to the ready queue
 
-// .. add more events
-// NOTE - not sure if this is the best way
 enum State {NEW = 1, READY = 2, WAITING = 3, RUNNING = 4, TERMINATED = 5};
 
 ////////////////////////////////////////////////////////////////     //event structure
@@ -49,6 +47,7 @@ int delete_event(struct event* eve);
 float urand();
 float genexp(float);
 process newProcess(int);
+event newEvent(int, int, float);
 int process_event2(struct event* eve);
 
 ////////////////////////////////////////////////////////////////
@@ -167,8 +166,9 @@ int run_sim()
 {
     event *eve;
     int p_count = 0;
+    int p_completed = 0;
     process p_table[SIZE];
-    while (p_count < SIZE)
+    while (p_completed < SIZE)
     {
         eve = head;
         cout << "eve->time: " << eve->time << endl;
@@ -176,41 +176,61 @@ int run_sim()
         switch (eve->type)
         {
             case ARRIVAL:
-                p_table[p_count] = newProcess(p_count);     // add new process to process table
-                eve->pid = p_table[p_count].pid;
-                event *newEvent;    // schedule next arrival
+            {
+                process p = newProcess(p_count);    // make new process
+                p_table[p_count] = p;               // add new process to process table
+                eve->pid = p.pid;                   // set event id to new process id
+                p_count++;                          // increment total process count
+
+                event *newEvent;                    // schedule next arrival
                 newEvent = new event;
-                newEvent->time = eve->time + 3;    // i put 3 here but this should be random i think
+                newEvent->time = eve->time + 3;     // TODO - i put 3 here but this should be random
                 schedule_event(newEvent);
                 break;
+            }
             case TIMESLICE:
+            {
                 // under FCFS, we know exactly when this process would finish, so we can schedule a
                 // completion event in the future and place it in the Event Queue
-                p_table[eve->pid].state = TERMINATED;
+                p_table[eve->pid].state = RUNNING;
                 p_table[eve->pid].remainingTime = 0;
-                eve->time = _clock + p_table[eve->pid].burst;
-                eve->type = DEPARTURE;
-                schedule_event(eve);
+
+                event newEvent = newEvent(eve->pid, DEPARTURE, _clock + p_table[eve->pid].burst);
+//                event *newEvent;                    // schedule next arrival
+//                newEvent = new event;
+//                newEvent->time = _clock + p_table[eve->pid].burst;
+//                newEvent->pid = eve->pid;
+//                newEvent->type = DEPARTURE;
+                //schedule_event(newEvent);
                 break;
+            }
             case DEPARTURE:
-                if (p_table[eve->pid].remainingTime == 0)
-                {
+            {
+                if (p_table[eve->pid].remainingTime == 0) {
                     p_table[eve->pid].state = TERMINATED;
                     delete_event(eve);
                 } else {
                     p_table[eve->pid].state = READY;
-                    schedule_event(eve);
-                }
-                break;
 
+                    event *newEvent = newEvent(eve->pid, TIMESLICE, _clock);
+//                    newEvent = new event;
+//                    newEvent->pid = eve->pid;
+//                    newEvent->type = TIMESLICE;
+//                    newEvent->time = _clock;
+
+                    schedule_event(newEvent);
+                }
+                p_completed++;                      // increment processes completed (end condition)
+                break;
+            }
             default:
                 cerr << "invalid event type\n";   // error
+                return 1;
         }
 
         head = eve->next;
         delete eve;
         eve = nullptr;
-        p_count++;
     }
     return 0;
 }
@@ -223,6 +243,15 @@ process newProcess(int index)
     p.burst = p.remainingTime = genexp(0.06);
     p.state = NEW;
     return p;
+}
+
+event newEvent(int pid, int type, float time)
+{
+    event newEvent;
+    newEvent->pid = pid;
+    newEvent->type = type;
+    newEvent->time = time;
+    return newEvent;
 }
 
 int process_event2(struct event* eve)
