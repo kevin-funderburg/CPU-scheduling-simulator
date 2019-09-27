@@ -24,7 +24,7 @@ using namespace std;
 #define DEPARTURE 2     // occurs when using algo 2, the process has used all its CPU time and is added back to the ready queue
 
 enum State {NEW = 1, READY = 2, WAITING = 3, RUNNING = 4, TERMINATED = 5};
-
+enum Scheduler {FCFS = 0, SRTF = 1, RR = 2};
 ////////////////////////////////////////////////////////////////     //event structure
 
 
@@ -55,6 +55,7 @@ int process_event2(struct event* eve);
 event* head; // head of event queue
 event* readyq;
 float _clock; // simulation clock, added underscore to make unique from system clock
+Scheduler scheduler;
 //int process_count;
 
 ////////////////////////////////////////////////////////////////
@@ -193,15 +194,23 @@ int run_sim()
                 // under FCFS, we know exactly when this process would finish, so we can schedule a
                 // completion event in the future and place it in the Event Queue
                 p_table[eve->pid].state = RUNNING;
-                p_table[eve->pid].remainingTime = 0;
+                switch scheduler
+                {
+                    case FCFS:
+                        p_table[eve->pid].remainingTime = 0;
+                    case SRTF:
+                        // something
+                    case RR:
+                        // something
+                }
 
-                event newEvent = newEvent(eve->pid, DEPARTURE, _clock + p_table[eve->pid].burst);
-//                event *newEvent;                    // schedule next arrival
-//                newEvent = new event;
-//                newEvent->time = _clock + p_table[eve->pid].burst;
-//                newEvent->pid = eve->pid;
-//                newEvent->type = DEPARTURE;
-                //schedule_event(newEvent);
+//                event newEvent = newEvent(eve->pid, DEPARTURE, _clock + p_table[eve->pid].burst);
+                event *newEvent;                    // schedule next arrival
+                newEvent = new event;
+                newEvent->time = _clock + p_table[eve->pid].burst;
+                newEvent->pid = eve->pid;
+                newEvent->type = DEPARTURE;
+                schedule_event(newEvent);
                 break;
             }
             case DEPARTURE:
@@ -212,11 +221,12 @@ int run_sim()
                 } else {
                     p_table[eve->pid].state = READY;
 
-                    event *newEvent = newEvent(eve->pid, TIMESLICE, _clock);
-//                    newEvent = new event;
-//                    newEvent->pid = eve->pid;
-//                    newEvent->type = TIMESLICE;
-//                    newEvent->time = _clock;
+//                    event *newEvent = newEvent(eve->pid, TIMESLICE, _clock);
+                    event *newEvent;
+                    newEvent = new event;
+                    newEvent->pid = eve->pid;
+                    newEvent->type = TIMESLICE;
+                    newEvent->time = _clock;
 
                     schedule_event(newEvent);
                 }
@@ -281,7 +291,7 @@ int main(int argc, char *argv[] )
         show_usage();
         return 1;
     }
-    int scheduler = stoi(argv[1]);
+    scheduler = stoi(argv[1]);
     float lambda = 1 / (stoi(argv[2]));   // 1 / argument is the arrival process time
     float avgServiceTime = stof(argv[3]);
     if (argc == 5)
