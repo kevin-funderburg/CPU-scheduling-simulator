@@ -10,8 +10,6 @@ struct event {
     float time;
     int   type;
     int   pid;
-    float remainingTime;
-    float burst;  // service time
     struct event* next;
 };
 

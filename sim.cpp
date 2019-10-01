@@ -21,14 +21,14 @@ using namespace std;
 #define DEPARTURE 2
 ////////////////////////////////////////////////////////////////
 enum State {NEW = 1, READY = 2, WAITING = 3, RUNNING = 4, TERMINATED = 5};
-enum Scheduler {FCFS = 0, SRTF = 1, RR = 2};
+enum Scheduler {FCFS = 1, SRTF = 2, RR = 3};
 ////////////////////////////////////////////////////////////////
 struct process {
-    int pid;            // process ID
-    int time;           // arrival time
-    int burst;          // service time
-    State state;        // process state
-    int remainingTime;  // time left for execution
+    int pid;                // process ID
+    int time;               // arrival time
+    float burst;            // service time
+    State state;            // process state
+    float remainingTime;    // time left for execution
     // TODO - add stats
 };
 ////////////////////////////////////////////////////////////////
@@ -63,6 +63,7 @@ void init()
 void generate_report()
 {
     // output statistics
+    clog << "outputting stats\n";
 }
 //////////////////////////////////////////////////////////////// //schedules an event in the future
 int schedule_event(event *newEvent)
@@ -88,8 +89,6 @@ int delete_event(event *eve)
 {
     return 0;
 }
-
-
 ////////////////////////////////////////////////////////////////
 // returns a random number between 0 and 1
 float urand()
@@ -246,13 +245,13 @@ static void show_usage()
 ////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[] )
 {
-    clog << "starting\n";
-    if (argc < 3) {
+    if (argc < 3)
+    {
         show_usage();
         return 1;
     }
-    // RR requires the quantum arg
-    if (*argv[2] == 3 && argc < 5) {
+    if (*argv[2] == 3 && argc < 5)      // RR requires the quantum arg
+    {
         cerr << "Expected 4 arguments and got " << argc << endl;
         show_usage();
         return 1;
