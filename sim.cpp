@@ -10,34 +10,27 @@
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
-
 #include "event.h"
 #include "list.h"
-
 using namespace std;
-
+////////////////////////////////////////////////////////////////
 #define SIZE 10
 #define MAX_PROCESSES 10000
-////////////////////////////////////////////////////////////////
-// TODO - need to clarify these events
 #define ARRIVAL 0
 #define TIMESLICE 1
-#define DEPARTURE 2     // occurs when using algo 2, the process has used all its CPU time and is added back to the ready queue
-
+#define DEPARTURE 2
+////////////////////////////////////////////////////////////////
 enum State {NEW = 1, READY = 2, WAITING = 3, RUNNING = 4, TERMINATED = 5};
 enum Scheduler {FCFS = 0, SRTF = 1, RR = 2};
-////////////////////////////////////////////////////////////////     //event structure
-
-
+////////////////////////////////////////////////////////////////
 struct process {
     int pid;            // process ID
     int time;           // arrival time
     int burst;          // service time
     State state;        // process state
     int remainingTime;  // time left for execution
-    // add stats
+    // TODO - add stats
 };
-
 ////////////////////////////////////////////////////////////////
 // function definition
 void init();
@@ -48,21 +41,19 @@ int delete_event(struct event* eve);
 float urand();
 float genexp(float);
 process newProcess(int);
-event newEvent(int, int, float);
+event* newEvent(int, int, float);
 int process_event2(struct event* eve);
-
 ////////////////////////////////////////////////////////////////
-//Global variables
+// Global variables
 event* head; // head of event queue
 float _clock; // simulation clock, added underscore to make unique from system clock
 Scheduler scheduler;
-//int process_count;
-
 ////////////////////////////////////////////////////////////////
 void init()
 {
     // initialize all variables, states, and end conditions
 
+//    event *newEvent = newEvent(0, ARRIVAL, 0);                // make next event
     event *newEvent = new event;                // make next event
     newEvent->time = 0;                         // generate arrival time of next event
     newEvent->type = ARRIVAL;
@@ -77,22 +68,19 @@ void generate_report()
 int schedule_event(event *newEvent)
 {
     // insert event in the event queue in its order of time
-
-    if (head == nullptr)    // schedule first event
+    if (head == nullptr || head->time >= newEvent->time)
     {
+        newEvent->next = head;
         head = newEvent;
-        head->next = nullptr;
     }
     else
     {
-        event *temp = head;
-        // TODO - this appends the new even to the queue, needs to be adjusted for priority
-        newEvent->next = nullptr;
-        while (temp->next != nullptr)
-            temp = temp->next;
-        temp->next = newEvent;
+        event *cursor = head;
+        while (cursor->next != nullptr && cursor->next->time < newEvent->time)
+            cursor = cursor->next;
+        newEvent->next = cursor->next;
+        cursor->next = newEvent;
     }
-
     return 0;
 }
 
@@ -233,12 +221,12 @@ process newProcess(int index)
     return p;
 }
 
-event newEvent(int pid, int type, float time)
+event* newEvent(int pid, int type, float time)
 {
-    event newEvent;
-    newEvent.pid = pid;
-    newEvent.type = type;
-    newEvent.time = time;
+    event *newEvent = new event;
+    newEvent->pid = pid;
+    newEvent->type = type;
+    newEvent->time = time;
     return newEvent;
 }
 
