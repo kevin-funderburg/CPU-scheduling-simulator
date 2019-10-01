@@ -17,6 +17,7 @@
 using namespace std;
 
 #define SIZE 10
+#define MAX_PROCESSES 10000
 ////////////////////////////////////////////////////////////////
 // TODO - need to clarify these events
 #define ARRIVAL 0
@@ -53,7 +54,6 @@ int process_event2(struct event* eve);
 ////////////////////////////////////////////////////////////////
 //Global variables
 event* head; // head of event queue
-event* readyq;
 float _clock; // simulation clock, added underscore to make unique from system clock
 Scheduler scheduler;
 //int process_count;
@@ -62,36 +62,11 @@ Scheduler scheduler;
 void init()
 {
     // initialize all variables, states, and end conditions
-    head = new event;
-    head->time = 0;
-    head->type = ARRIVAL;
-    head->next = nullptr;
-//    ///
-//    /// NOTE - not sure if this can be an array when initializing or a linked list
-//    /// so this is commented out below, but we may use it
-//// add a process ID
-//// process arrives at a certain time
-//    event processes[SIZE];
-//    for (int i = 0; i < SIZE; ++i) {
-//        processes[i].time = i;
-//        processes[i].burst = genexp(0.06);
-//    }
 
-    ////
-    //// This is creating the processes in a linked list
-    ////
-//    event *cursor;
-//    cursor = head;
-//    for (int i = 0; i < SIZE; ++i) {
-//        cursor->time = i;
-//        cursor->burst = genexp(0.06);
-//        cursor->next = new event;
-//        cursor = cursor->next;
-//    }
-//    cursor->next = nullptr;
-
-    // schedule first events
-//    schedule_event(head);
+    event *newEvent = new event;                // make next event
+    newEvent->time = 0;                         // generate arrival time of next event
+    newEvent->type = ARRIVAL;
+    schedule_event(newEvent);                   // schedule first event into event queue
 }
 ////////////////////////////////////////////////////////////////
 void generate_report()
@@ -103,37 +78,21 @@ int schedule_event(event *newEvent)
 {
     // insert event in the event queue in its order of time
 
-    /**
-     * This is supposed to add an event to the queue based on the time
-     * It still needs work
-    event* cursor;
-    cursor = head;
-
-    bool inserted = false;
-
-    if (head == nullptr)
-        head = new event;
-    while (!inserted) {
-        if (cursor->time < newEvent->time)
-        {
-            if (cursor->next == nullptr) {  // list length is 1
-                cursor->next = newEvent;
-                return 0;
-            }
-            else if (cursor->next->time > newEvent->time)
-            {
-                event* temp = new event;
-            }
-        }
+    if (head == nullptr)    // schedule first event
+    {
+        head = newEvent;
+        head->next = nullptr;
     }
-     **/
-    event *temp = head;
-    // this appends the new even to the queue, needs to be adjusted for priority,
-    newEvent->next = nullptr;
-    while (temp->next != nullptr) {
-        temp = temp->next;
+    else
+    {
+        event *temp = head;
+        // TODO - this appends the new even to the queue, needs to be adjusted for priority
+        newEvent->next = nullptr;
+        while (temp->next != nullptr)
+            temp = temp->next;
+        temp->next = newEvent;
     }
-    temp->next = newEvent;
+
     return 0;
 }
 
@@ -165,11 +124,13 @@ float genexp(float lambda)
 ////////////////////////////////////////////////////////////
 int run_sim()
 {
+    int p_count = 0,            // total count of processes
+        p_completed = 0;        // count of processes who have completed processing
+
     event *eve;
-    int p_count = 0;
-    int p_completed = 0;
-    process p_table[SIZE];
-    while (p_completed < SIZE)
+    process p_table[SIZE];      // table containing process data
+
+    while (p_completed < MAX_PROCESSES)
     {
         eve = head;
         cout << "eve->time: " << eve->time << endl;
@@ -178,50 +139,68 @@ int run_sim()
         {
             case ARRIVAL:
             {
-                process p = newProcess(p_count);    // make new process
-                p_table[p_count] = p;               // add new process to process table
-                eve->pid = p.pid;                   // set event id to new process id
-                p_count++;                          // increment total process count
+                cout << "event type: ARRIVAL\n";
 
-                event *newEvent;                    // schedule next arrival
-                newEvent = new event;
-                newEvent->time = eve->time + 3;     // TODO - i put 3 here but this should be random
-                schedule_event(newEvent);
+                process p = newProcess(p_count);            // make new process
+                p_table[p_count] = p;                       // add new process to process table
+                eve->pid = p.pid;                           // set event id to new process id
+                p_count++;                                  // increment total process count
+
+                event *newEvent = new event;                // make next event
+                newEvent->type = ARRIVAL;                   // set type of next event
+                newEvent->time = eve->time + genexp(0.06);  // generate arrival time of next event's arrival
+                schedule_event(newEvent);                   // schedule newEvent into event queue
                 break;
             }
             case TIMESLICE:
             {
-                // under FCFS, we know exactly when this process would finish, so we can schedule a
-                // completion event in the future and place it in the Event Queue
-                p_table[eve->pid].state = RUNNING;
-                switch scheduler
+                cout << "event type: TIMESLICE\n";
+
+                p_table[eve->pid].state = RUNNING;          // set process in process table state to running
+
+                event *newEvent = new event;                // create new event
+                newEvent->pid = eve->pid;                   // set event id to process id
+
+                switch (scheduler)
                 {
                     case FCFS:
-                        p_table[eve->pid].remainingTime = 0;
+                        p_table[eve->pid].remainingTime = 0;    // FCFS processes to completion, so process has no remaining time
+                        /**
+                         * under FCFS, we know exactly when this process would finish, so we can schedule a
+                         * completion event in the future and place it in the Event Queue
+                         **/
+                        newEvent->time = _clock + p_table[eve->pid].burst;  // event time is the current time + burst time of process
+                        newEvent->type = DEPARTURE;                         // set event type to leave the CPU
+                        break;
                     case SRTF:
                         // something
+                        break;
                     case RR:
                         // something
+                        break;
+                    default:
+                        cerr << "invalid algorithm" << endl;
+                        return 1;
                 }
 
-//                event newEvent = newEvent(eve->pid, DEPARTURE, _clock + p_table[eve->pid].burst);
-                event *newEvent;                    // schedule next arrival
-                newEvent = new event;
-                newEvent->time = _clock + p_table[eve->pid].burst;
-                newEvent->pid = eve->pid;
-                newEvent->type = DEPARTURE;
                 schedule_event(newEvent);
                 break;
             }
             case DEPARTURE:
             {
-                if (p_table[eve->pid].remainingTime == 0) {
+                cout << "event type: DEPARTURE\n";
+
+                if (p_table[eve->pid].remainingTime == 0)   // remaining processing time is 0
+                {
                     p_table[eve->pid].state = TERMINATED;
+                    p_completed++;  // end condition
+                    cout << "number of processes completed: " << p_completed << endl;
                     delete_event(eve);
-                } else {
+                }
+                else    // remaining process time > 0, so put back into ready queue
+                {
                     p_table[eve->pid].state = READY;
 
-//                    event *newEvent = newEvent(eve->pid, TIMESLICE, _clock);
                     event *newEvent;
                     newEvent = new event;
                     newEvent->pid = eve->pid;
@@ -230,7 +209,6 @@ int run_sim()
 
                     schedule_event(newEvent);
                 }
-                p_completed++;                      // increment processes completed (end condition)
                 break;
             }
             default:
@@ -258,9 +236,9 @@ process newProcess(int index)
 event newEvent(int pid, int type, float time)
 {
     event newEvent;
-    newEvent->pid = pid;
-    newEvent->type = type;
-    newEvent->time = time;
+    newEvent.pid = pid;
+    newEvent.type = type;
+    newEvent.time = time;
     return newEvent;
 }
 
@@ -291,7 +269,7 @@ int main(int argc, char *argv[] )
         show_usage();
         return 1;
     }
-    scheduler = stoi(argv[1]);
+    scheduler = static_cast<Scheduler>(stoi(argv[1]));
     float lambda = 1 / (stoi(argv[2]));   // 1 / argument is the arrival process time
     float avgServiceTime = stof(argv[3]);
     if (argc == 5)
