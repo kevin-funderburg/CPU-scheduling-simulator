@@ -133,10 +133,19 @@ int run_sim()
                 eve->pid = p.pid;                           // set event id to new process id
                 p_count++;                                  // increment total process count
 
-                event *newEvent = new event;                // make next event
-                newEvent->type = ARRIVAL;                   // set type of next event
-                newEvent->time = eve->time + genexp(0.06);  // generate arrival time of next event's arrival
-                schedule_event(newEvent);                   // schedule newEvent into event queue
+                /* NOTE
+                 * Seems as if a TIMESLICE events needs to be added to the queue for
+                 * the process just created THEN another arrival event needs to be
+                 */
+                event *timeslice = new event;
+                timeslice->type = TIMESLICE;
+                timeslice->time = eve->time;
+                schedule_event(timeslice);
+
+                event *arrival = new event;                // make next arrival event
+                arrival->type = ARRIVAL;                   // set type of next event
+                arrival->time = eve->time + genexp(0.06);  // generate arrival time of next event's arrival
+                schedule_event(arrival);                   // schedule arrival into event queue
                 break;
             }
             case TIMESLICE:
@@ -256,8 +265,8 @@ int main(int argc, char *argv[] )
         show_usage();
         return 1;
     }
-    scheduler = static_cast<Scheduler>(stoi(argv[1]));
-    float lambda = 1 / (stoi(argv[2]));   // 1 / argument is the arrival process time
+    scheduler = static_cast<Scheduler>(stoi(argv[1]));  // set scheduler algorithm
+    float lambda = 1 / (stoi(argv[2]));                 // 1 / argument is the arrival process time
     float avgServiceTime = stof(argv[3]);
     if (argc == 5)
         float quantum = stof(argv[4]);
