@@ -115,7 +115,7 @@ int run_sim()
         p_completed = 0;        // count of processes who have completed processing
 
     event *eve;
-    process p_table[SIZE];      // table containing process data
+    process p_table[MAX_PROCESSES+100];      // table containing process data
 
     while (p_completed < MAX_PROCESSES)
     {
@@ -130,17 +130,17 @@ int run_sim()
 
                 process p = newProcess(p_count);            // make new process
                 p_table[p_count] = p;                       // add new process to process table
-                eve->pid = p.pid;                           // set event id to new process id
+                eve->pid = p.pid;                           // set event id to new process id - MAYBE DELETE
                 p_count++;                                  // increment total process count
 
                 /* NOTE
                  * Seems as if a TIMESLICE events needs to be added to the queue for
-                 * the process just created THEN another arrival event needs to be
+                 * the process just created THEN another arrival event needs to be added to the queue
                  */
-                event *timeslice = new event;
-                timeslice->type = TIMESLICE;
-                timeslice->time = eve->time;
-                schedule_event(timeslice);
+//                event *timeslice = new event;
+//                timeslice->type = TIMESLICE;
+//                timeslice->time = eve->time;
+//                schedule_event(timeslice);
 
                 event *arrival = new event;                // make next arrival event
                 arrival->type = ARRIVAL;                   // set type of next event
@@ -182,11 +182,11 @@ int run_sim()
                 schedule_event(newEvent);
                 break;
             }
-            case DEPARTURE:
+            case DEPARTURE: //can mean either complete process or return process to ready queue
             {
                 cout << "event type: DEPARTURE\n";
 
-                if (p_table[eve->pid].remainingTime == 0)   // remaining processing time is 0
+                if (p_table[eve->pid].remainingTime <= 0)   // remaining processing time is 0
                 {
                     p_table[eve->pid].state = TERMINATED;
                     p_completed++;  // end condition
