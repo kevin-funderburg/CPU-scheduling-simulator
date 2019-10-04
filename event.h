@@ -13,5 +13,11 @@ struct event {
     struct event* next;
 };
 
+struct eventComparator {
+    bool operator() (const event * left, const event * right) const {
+        return left->time > right->time;
+    }
+};
+
 #endif
 
