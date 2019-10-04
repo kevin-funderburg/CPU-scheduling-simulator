@@ -3,8 +3,7 @@
 //
 #include "event.h"
 
-Event::Event(EventType evetype, float t)
-      : type(evetype), time(t)
+event::event(EventType evetype, float t) : type(evetype), time(t)
 {
 
 }
