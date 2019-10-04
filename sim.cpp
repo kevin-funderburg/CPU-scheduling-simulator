@@ -266,6 +266,7 @@ int main(int argc, char *argv[] )
         return 1;
     }
     scheduler = static_cast<Scheduler>(stoi(argv[1]));  // set scheduler algorithm
+    // avgnumprocesses 1 / lambda * num_proceesses i think
     float lambda = 1 / (stoi(argv[2]));                 // 1 / argument is the arrival process time
     float avgServiceTime = stof(argv[3]);
     if (argc == 5)
