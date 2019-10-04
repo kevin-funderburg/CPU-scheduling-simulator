@@ -4,7 +4,7 @@
 #ifndef EVENT_H
 #define EVENT_H
 
-enum EventType {ARRIVAL = 0, DISPATCHED = 1, COMPLETION = 2, PREEMPTED = 3};
+enum EventType {ARRIVAL = 0, IN_CPU = 1, LEAVE_CPU = 2, TERMINATED = 3};
 
 // representation of a task
 class event

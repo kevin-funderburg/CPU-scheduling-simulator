@@ -13,30 +13,30 @@ class Process {
 public:
     Process();
     Process(int, float, State, float);
-    float getRemainingTime();
+    float remainingTime();
     void output();
 
     int pid;
     float arrivalTime;
     State state;
     float burst;
-    float remainingTime;
+    float completed_CPU_time;
     float departureTime;
 };
 
 Process::Process()
-        : pid(0), arrivalTime(0.0), state(READY), burst(0.0), remainingTime(0.0), departureTime(0.0)
+        : pid(0), arrivalTime(0.0), state(READY), burst(0.0), completed_CPU_time(0.0), departureTime(0.0)
 {
 
 }
 
 Process::Process(int id, float a_time, State s, float t)
-        : pid(id), arrivalTime(a_time), state(s), burst(t), remainingTime(t), departureTime(0.0)
+        : pid(id), arrivalTime(a_time), state(s), burst(t), completed_CPU_time(t), departureTime(0.0)
 {}
 
-float Process::getRemainingTime()
+float Process::remainingTime()
 {
-    return remainingTime;
+    return burst - completed_CPU_time;
 }
 
 void Process::output()
@@ -45,7 +45,7 @@ void Process::output()
          << "\narrival: " << arrivalTime
          << "\nstate: " << state
          << "\nburst: " << burst
-         << "\nremaining: " << remainingTime
+         << "\nremaining: " << completed_CPU_time
          << "\ndeparture: " << departureTime << std::endl;
 }
 
