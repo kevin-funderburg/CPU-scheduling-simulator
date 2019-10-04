@@ -10,6 +10,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
+#include <queue>
 #include "event.h"
 #include "list.h"
 #include "header.h"
@@ -25,6 +26,9 @@ event* head; // head of event queue
 float _clock; // simulation clock, added underscore to make unique from system clock
 Scheduler scheduler;
 bool CPUbusy;
+priority_queue<event*,
+        vector<event *, allocator<event*> >,
+        eventComparator> eventQueue;
 
 void parseArgs(int argc, char *argv[])
 {
@@ -80,6 +84,11 @@ int schedule_event(event *newEvent)
     }
     return 0;
 }
+
+void schedule_event_eventQ(event *newEvent)
+{
+    eventQueue.push(newEvent);
+};
 
 int delete_event(event *eve)
 {

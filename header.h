@@ -13,7 +13,7 @@ enum Scheduler {_FCFS = 1, _SRTF = 2, _RR = 3};
 ////////////////////////////////////////////////////////////////
 struct process {
     int pid;                // process ID
-    int time;               // arrival time
+    int arrivalTime;        // arrival time
     float burst;            // service time
     State state;            // process state
     float remainingTime;    // time left for execution
@@ -41,5 +41,6 @@ void scheduleArrival();
 void scheduleDeparture();
 void scheduleAllocation();
 void schedulePreemption();
+void schedule_event_eventQ(event *newEvent);
 
 #endif //HEADER_H
