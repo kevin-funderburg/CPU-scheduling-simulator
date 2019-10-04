@@ -16,11 +16,12 @@ using namespace std;
 ////////////////////////////////////////////////////////////////
 #define SIZE 10
 #define MAX_PROCESSES 10000
-#define ARRIVAL 0
-#define TIMESLICE 1
-#define DEPARTURE 2
+#define PROCESS_CREATION 0
+#define DISPATCHED 1
+#define COMPLETION 2
+#define PREEMPTED 3
 ////////////////////////////////////////////////////////////////
-enum State {NEW = 1, READY = 2, WAITING = 3, RUNNING = 4, TERMINATED = 5};
+enum State {READY = 1, WAITING = 3, RUNNING = 4, TERMINATED = 5};
 enum Scheduler {FCFS = 1, SRTF = 2, RR = 3};
 ////////////////////////////////////////////////////////////////
 struct process {
@@ -53,10 +54,10 @@ void init()
 {
     // initialize all variables, states, and end conditions
 
-//    event *newEvent = newEvent(0, ARRIVAL, 0);                // make next event
+//    event *newEvent = newEvent(0, PROCESS_CREATION, 0);                // make next event
     event *newEvent = new event;                // make next event
     newEvent->time = 0;                         // generate arrival time of next event
-    newEvent->type = ARRIVAL;
+    newEvent->type = PROCESS_CREATION;
     schedule_event(newEvent);                   // schedule first event into event queue
 }
 ////////////////////////////////////////////////////////////////
@@ -124,9 +125,9 @@ int run_sim()
         _clock = eve->time;
         switch (eve->type)
         {
-            case ARRIVAL:
+            case PROCESS_CREATION:
             {
-                cout << "event type: ARRIVAL\n";
+                cout << "event type: PROCESS_CREATION\n";
 
                 process p = newProcess(p_count);            // make new process
                 p_table[p_count] = p;                       // add new process to process table
@@ -134,23 +135,23 @@ int run_sim()
                 p_count++;                                  // increment total process count
 
                 /* NOTE
-                 * Seems as if a TIMESLICE events needs to be added to the queue for
-                 * the process just created THEN another arrival event needs to be
+                 * Seems as if a DISPATCHED events needs to be added to the queue for
+                 * the process just created THEN another creation event needs to be
                  */
                 event *timeslice = new event;
-                timeslice->type = TIMESLICE;
+                timeslice->type = DISPATCHED;
                 timeslice->time = eve->time;
                 schedule_event(timeslice);
 
-                event *arrival = new event;                // make next arrival event
-                arrival->type = ARRIVAL;                   // set type of next event
-                arrival->time = eve->time + genexp(0.06);  // generate arrival time of next event's arrival
-                schedule_event(arrival);                   // schedule arrival into event queue
+                event *creation = new event;                // make next creation event
+                creation->type = PROCESS_CREATION;          // set type of next event
+                creation->time = eve->time + genexp(0.06);  // generate creation time of next event's creation
+                schedule_event(creation);                   // schedule creation into event queue
                 break;
             }
-            case TIMESLICE:
+            case DISPATCHED:
             {
-                cout << "event type: TIMESLICE\n";
+                cout << "event type: DISPATCHED\n";
 
                 p_table[eve->pid].state = RUNNING;          // set process in process table state to running
 
@@ -166,7 +167,7 @@ int run_sim()
                          * completion event in the future and place it in the Event Queue
                          **/
                         newEvent->time = _clock + p_table[eve->pid].burst;  // event time is the current time + burst time of process
-                        newEvent->type = DEPARTURE;                         // set event type to leave the CPU
+                        newEvent->type = COMPLETION;                         // set event type to leave the CPU
                         break;
                     case SRTF:
                         // something
@@ -182,9 +183,9 @@ int run_sim()
                 schedule_event(newEvent);
                 break;
             }
-            case DEPARTURE:
+            case COMPLETION:
             {
-                cout << "event type: DEPARTURE\n";
+                cout << "event type: COMPLETION\n";
 
                 if (p_table[eve->pid].remainingTime == 0)   // remaining processing time is 0
                 {
@@ -200,12 +201,16 @@ int run_sim()
                     event *newEvent;
                     newEvent = new event;
                     newEvent->pid = eve->pid;
-                    newEvent->type = TIMESLICE;
+                    newEvent->type = DISPATCHED;
                     newEvent->time = _clock;
 
                     schedule_event(newEvent);
                 }
                 break;
+            }
+            case PREEMPTED:
+            {
+                // do something
             }
             default:
                 cerr << "invalid event type\n";   // error
@@ -222,10 +227,9 @@ int run_sim()
 process newProcess(int index)
 {
     process p;
-    p.pid = index;
-    p.time = index;
+    p.pid = p.time = index;
     p.burst = p.remainingTime = genexp(0.06);
-    p.state = NEW;
+    p.state = READY;
     return p;
 }
 
