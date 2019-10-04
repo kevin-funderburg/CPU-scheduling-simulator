@@ -10,27 +10,35 @@
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
-#include "event.h"
-#include "list.h"
+//#include "event.h"
+//#include "list.h"
 using namespace std;
 ////////////////////////////////////////////////////////////////
 #define SIZE 10
 #define MAX_PROCESSES 10000
-#define PROCESS_CREATION 0
-#define DISPATCHED 1
-#define COMPLETION 2
-#define PREEMPTED 3
+//#define PROCESS_CREATION 0
+//#define DISPATCHED 1
+//#define COMPLETION 2
+//#define PREEMPTED 3
 ////////////////////////////////////////////////////////////////
-enum State {READY = 1, WAITING = 3, RUNNING = 4, TERMINATED = 5};
+enum EventType {PROCESS_CREATION = 0, DISPATCHED = 1, COMPLETION = 2, PREEMPTED = 3};
+enum State {READY = 1, RUNNING = 2, TERMINATED = 3};
 enum Scheduler {FCFS = 1, SRTF = 2, RR = 3};
 ////////////////////////////////////////////////////////////////
 struct process {
     int pid;                // process ID
-    int time;               // arrival time
+    float time;             // arrival time
     float burst;            // service time
     State state;            // process state
     float remainingTime;    // time left for execution
-    // TODO - add stats
+    float completionTime;
+};
+// representation of a task
+struct event {
+    float time;
+    int   pid;
+    EventType   type;
+    struct event* next;
 };
 ////////////////////////////////////////////////////////////////
 // function definition
@@ -42,7 +50,7 @@ int delete_event(struct event* eve);
 float urand();
 float genexp(float);
 process newProcess(int);
-event* newEvent(int, int, float);
+//event* newEvent(int, int, float);
 int process_event2(struct event* eve);
 ////////////////////////////////////////////////////////////////
 // Global variables
@@ -53,8 +61,6 @@ Scheduler scheduler;
 void init()
 {
     // initialize all variables, states, and end conditions
-
-//    event *newEvent = newEvent(0, PROCESS_CREATION, 0);                // make next event
     event *newEvent = new event;                // make next event
     newEvent->time = 0;                         // generate arrival time of next event
     newEvent->type = PROCESS_CREATION;
@@ -116,58 +122,71 @@ int run_sim()
         p_completed = 0;        // count of processes who have completed processing
 
     event *eve;
-    process p_table[SIZE];      // table containing process data
+    process p_table[MAX_PROCESSES+1000];      // table containing process data
 
     while (p_completed < MAX_PROCESSES)
     {
         eve = head;
-        cout << "eve->time: " << eve->time << endl;
         _clock = eve->time;
+        cout << "MILLISECONDS: " << _clock << endl;
         switch (eve->type)
         {
             case PROCESS_CREATION:
             {
-                cout << "event type: PROCESS_CREATION\n";
+                cout << "\tevent type:\t\t\tPROCESS_CREATION\n";
 
-                process p = newProcess(p_count);            // make new process
+                process p;
+                p.pid = p_count;
+                p.time = _clock;
+                p.burst = p.remainingTime = genexp(0.06);
+                p.state = READY;
+
                 p_table[p_count] = p;                       // add new process to process table
-                eve->pid = p.pid;                           // set event id to new process id
+
                 p_count++;                                  // increment total process count
 
-                /* NOTE
-                 * Seems as if a DISPATCHED events needs to be added to the queue for
-                 * the process just created THEN another creation event needs to be
-                 */
-                event *timeslice = new event;
-                timeslice->type = DISPATCHED;
-                timeslice->time = eve->time;
-                schedule_event(timeslice);
+                event *dispatch = new event;                // make next creation event
+                dispatch->type = DISPATCHED;                // set type of next event
+                dispatch->pid = p.pid;                      // set id of process to be dispatched
+                dispatch->time = _clock + 1;                // generate dispatch time of next event's creation
+                schedule_event(dispatch);                   // schedule creation into event queue
 
                 event *creation = new event;                // make next creation event
                 creation->type = PROCESS_CREATION;          // set type of next event
-                creation->time = eve->time + genexp(0.06);  // generate creation time of next event's creation
+                creation->time = _clock + genexp(0.06);     // generate creation time of next event's creation
                 schedule_event(creation);                   // schedule creation into event queue
                 break;
             }
             case DISPATCHED:
             {
-                cout << "event type: DISPATCHED\n";
+                cout << "\tevent type:\t\t\tDISPATCHED\n";
 
                 p_table[eve->pid].state = RUNNING;          // set process in process table state to running
-
-                event *newEvent = new event;                // create new event
-                newEvent->pid = eve->pid;                   // set event id to process id
 
                 switch (scheduler)
                 {
                     case FCFS:
-                        p_table[eve->pid].remainingTime = 0;    // FCFS processes to completion, so process has no remaining time
+                    {
                         /**
                          * under FCFS, we know exactly when this process would finish, so we can schedule a
                          * completion event in the future and place it in the Event Queue
                          **/
-                        newEvent->time = _clock + p_table[eve->pid].burst;  // event time is the current time + burst time of process
-                        newEvent->type = COMPLETION;                         // set event type to leave the CPU
+                        p_table[eve->pid].remainingTime = 0;    // FCFS processes to completion, so process has no remaining time
+
+                        event *completion = new event;                // create new event
+                        completion->pid = eve->pid;                   // set event id to process id
+                        completion->time = _clock + p_table[eve->pid].burst;  // event time is the current time + burst time of process
+                        completion->type = COMPLETION;                         // set event type to leave the CPU
+                        schedule_event(completion);
+
+                        event *dispatch = new event;                // make next creation event
+                        dispatch->pid = p_count += 1;
+                        dispatch->type = DISPATCHED;                // set type of next event
+                        dispatch->time = _clock + p_table[eve->pid].burst + 1;   // generate dispatch time of next event's creation
+                        schedule_event(dispatch);                   // schedule creation into event queue
+
+                        _clock += p_table[eve->pid].burst;      // clock will be set to the amount of time it takes to complete processing
+                    }
                         break;
                     case SRTF:
                         // something
@@ -180,19 +199,18 @@ int run_sim()
                         return 1;
                 }
 
-                schedule_event(newEvent);
                 break;
             }
             case COMPLETION:
             {
-                cout << "event type: COMPLETION\n";
+                cout << "\tevent type:\t\t\tCOMPLETION\n";
 
                 if (p_table[eve->pid].remainingTime == 0)   // remaining processing time is 0
                 {
                     p_table[eve->pid].state = TERMINATED;
+                    p_table[eve->pid].completionTime = _clock;
                     p_completed++;  // end condition
-                    cout << "number of processes completed: " << p_completed << endl;
-                    delete_event(eve);
+//                    delete_event(eve);
                 }
                 else    // remaining process time > 0, so put back into ready queue
                 {
@@ -216,10 +234,11 @@ int run_sim()
                 cerr << "invalid event type\n";   // error
                 return 1;
         }
-
         head = eve->next;
         delete eve;
         eve = nullptr;
+
+        cout << "\tPROCESSES MADE\t\t[" << p_count << "]\n\tPROCESSES COMPLETED\t[" << p_completed << "]\n";
     }
     return 0;
 }
@@ -233,14 +252,14 @@ process newProcess(int index)
     return p;
 }
 
-event* newEvent(int pid, int type, float time)
-{
-    event *newEvent = new event;
-    newEvent->pid = pid;
-    newEvent->type = type;
-    newEvent->time = time;
-    return newEvent;
-}
+//event* newEvent(int pid, int type, float time)
+//{
+//    event *newEvent = new event;
+//    newEvent->pid = pid;
+//    newEvent->type = type;
+//    newEvent->time = time;
+//    return newEvent;
+//}
 
 int process_event2(struct event* eve)
 {
