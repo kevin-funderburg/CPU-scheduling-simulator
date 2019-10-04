@@ -5,50 +5,44 @@
 /////////////////////////////////////////////////
 // TODO - Add a Process Ready Queue
 // ASKPROF - can we use priority queue from stdlib?
-// Use 105 ms for the preemptive SRTF
+// Use 105 ms for the preemptive _SRTF
 /////////////////////////////////////////////////
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
 #include "event.h"
 #include "list.h"
+#include "header.h"
 using namespace std;
 ////////////////////////////////////////////////////////////////
-#define SIZE 10
-#define MAX_PROCESSES 10000
-#define ARRIVAL 0
-#define TIMESLICE 1
-#define DEPARTURE 2
-////////////////////////////////////////////////////////////////
-enum State {NEW = 1, READY = 2, WAITING = 3, RUNNING = 4, TERMINATED = 5};
-enum Scheduler {FCFS = 1, SRTF = 2, RR = 3};
-////////////////////////////////////////////////////////////////
-struct process {
-    int pid;                // process ID
-    int time;               // arrival time
-    float burst;            // service time
-    State state;            // process state
-    float remainingTime;    // time left for execution
-    // TODO - add stats
-};
-////////////////////////////////////////////////////////////////
-// function definition
-void init();
-int run_sim();
-void generate_report();
-int schedule_event(struct event*);
-int delete_event(struct event* eve);
-float urand();
-float genexp(float);
-process newProcess(int);
-event* newEvent(int, int, float);
-int process_event2(struct event* eve);
+
+
 ////////////////////////////////////////////////////////////////
 // Global variables
 event* head; // head of event queue
 float _clock; // simulation clock, added underscore to make unique from system clock
 Scheduler scheduler;
-////////////////////////////////////////////////////////////////
+bool CPUbusy;
+
+void parseArgs(int argc, char *argv[])
+{
+    scheduler = static_cast<Scheduler>(stoi(argv[1]));  // set scheduler algorithm
+    // avgnumprocesses 1 / lambda * num_proceesses i think
+    float lambda = 1 / (stof(argv[2]));                 // 1 / argument is the arrival process time
+    float avgServiceTime = stof(argv[3]);
+    if (argc == 5)
+        float quantum = stof(argv[4]);
+}
+
+static void show_usage()
+{
+    cerr << "Usage: sim [123] [average arrival rate] [average service time] [quantum interval]\n\n"
+         << "Options:\n"
+         << "\t1 : First-Come First-Served (_FCFS)\n"
+         << "\t2 : Shortest Remaining Time First (_SRTF)\n"
+         << "\t3 : Round Robin, with different quantum values (_RR) (requires 4 arguments)\n";
+}
+
 void init()
 {
     // initialize all variables, states, and end conditions
@@ -56,7 +50,7 @@ void init()
 //    event *newEvent = newEvent(0, ARRIVAL, 0);                // make next event
     event *newEvent = new event;                // make next event
     newEvent->time = 0;                         // generate arrival time of next event
-    newEvent->type = ARRIVAL;
+    newEvent->type = ARRIVE;
     schedule_event(newEvent);                   // schedule first event into event queue
 }
 ////////////////////////////////////////////////////////////////
@@ -108,6 +102,27 @@ float genexp(float lambda)
     }
     return(x);
 }
+
+void scheduleArrival()
+{
+
+}
+
+void scheduleDeparture()
+{
+
+}
+
+void scheduleAllocation()
+{
+
+}
+
+void schedulePreemption()
+{
+
+}
+
 ////////////////////////////////////////////////////////////
 int run_sim()
 {
@@ -124,7 +139,7 @@ int run_sim()
         _clock = eve->time;
         switch (eve->type)
         {
-            case ARRIVAL:
+            case ARRIVE:
             {
                 cout << "event type: ARRIVAL\n";
 
@@ -148,7 +163,7 @@ int run_sim()
                 schedule_event(arrival);                   // schedule arrival into event queue
                 break;
             }
-            case TIMESLICE:
+            case IN_CPU:
             {
                 cout << "event type: TIMESLICE\n";
 
@@ -159,8 +174,8 @@ int run_sim()
 
                 switch (scheduler)
                 {
-                    case FCFS:
-                        p_table[eve->pid].remainingTime = 0;    // FCFS processes to completion, so process has no remaining time
+                    case _FCFS:
+                        p_table[eve->pid].remainingTime = 0;    // _FCFS processes to completion, so process has no remaining time
                         /**
                          * under FCFS, we know exactly when this process would finish, so we can schedule a
                          * completion event in the future and place it in the Event Queue
@@ -168,10 +183,10 @@ int run_sim()
                         newEvent->time = _clock + p_table[eve->pid].burst;  // event time is the current time + burst time of process
                         newEvent->type = DEPARTURE;                         // set event type to leave the CPU
                         break;
-                    case SRTF:
+                    case _SRTF:
                         // something
                         break;
-                    case RR:
+                    case _RR:
                         // something
                         break;
                     default:
@@ -182,7 +197,7 @@ int run_sim()
                 schedule_event(newEvent);
                 break;
             }
-            case DEPARTURE: //can mean either complete process or return process to ready queue
+            case LEAVE_CPU: //can mean either complete process or return process to ready queue
             {
                 cout << "event type: DEPARTURE\n";
 
@@ -207,6 +222,8 @@ int run_sim()
                 }
                 break;
             }
+            case COMPLETION:
+                // do something
             default:
                 cerr << "invalid event type\n";   // error
                 return 1;
@@ -229,10 +246,9 @@ process newProcess(int index)
     return p;
 }
 
-event* newEvent(int pid, int type, float time)
+event* newEvent(int pid, EventType type, float time)
 {
     event *newEvent = new event;
-    newEvent->pid = pid;
     newEvent->type = type;
     newEvent->time = time;
     return newEvent;
@@ -243,14 +259,22 @@ int process_event2(struct event* eve)
     return 0;   // PLACEHOLDER
 }
 
-static void show_usage()
+void FCFS()
 {
-    cerr << "Usage: sim [123] [average arrival rate] [average service time] [quantum interval]\n\n"
-         << "Options:\n"
-         << "\t1 : First-Come First-Served (FCFS)\n"
-         << "\t2 : Shortest Remaining Time First (SRTF)\n"
-         << "\t3 : Round Robin, with different quantum values (RR) (requires 4 arguments)\n";
+    int departureCount = 0;
+    int arrivalCount = 0;
+    int allocationCount = 0;
 }
+
+void SRTF()
+{
+
+}
+void RR()
+{
+
+}
+
 ////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[] )
 {
@@ -259,19 +283,13 @@ int main(int argc, char *argv[] )
         show_usage();
         return 1;
     }
-    if (*argv[2] == 3 && argc < 5)      // RR requires the quantum arg
+    if (*argv[2] == 3 && argc < 5)      // _RR requires the quantum arg
     {
         cerr << "Expected 4 arguments and got " << argc << endl;
         show_usage();
         return 1;
     }
-    scheduler = static_cast<Scheduler>(stoi(argv[1]));  // set scheduler algorithm
-    // avgnumprocesses 1 / lambda * num_proceesses i think
-    float lambda = 1 / (stoi(argv[2]));                 // 1 / argument is the arrival process time
-    float avgServiceTime = stof(argv[3]);
-    if (argc == 5)
-        float quantum = stof(argv[4]);
-
+    parseArgs(argc, argv);
     init();
     run_sim();
     generate_report();

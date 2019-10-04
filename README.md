@@ -29,9 +29,9 @@ Command line structure:
 ```shell
 sim [123] [average arrival rate] [average service time] [quantum interval]
 
-1 : First-Come First-Served (FCFS)
-2 : Shortest Remaining Time First (SRTF)
-3 : Round Robin, with different quantum values (RR) 
+1 : First-Come First-Served (_FCFS)
+2 : Shortest Remaining Time First (_SRTF)
+3 : Round Robin, with different quantum values (_RR) 
 ```
 
 

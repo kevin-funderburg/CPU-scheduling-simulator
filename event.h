@@ -5,11 +5,11 @@
 #ifndef EVENT_H
 #define EVENT_H
 
-// representation of a task
+enum EventType {ARRIVE = 0, IN_CPU = 1, LEAVE_CPU = 2, COMPLETION = 3};
+// representation of an event
 struct event {
     float time;
-    int   type;
-    int   pid;
+    EventType type;
     struct event* next;
 };
 
