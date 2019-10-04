@@ -12,7 +12,7 @@ class Process {
 
 public:
     Process();
-    Process(int, float, State, float, float, float);
+    Process(int, float, State, float);
     float getRemainingTime();
     void output();
 
@@ -30,11 +30,9 @@ Process::Process()
 
 }
 
-Process::Process(int id, float a_time, State s, float b, float r_time, float d_time)
-        : pid(id), arrivalTime(a_time), state(s), burst(b), remainingTime(r_time), departureTime(d_time)
-{
-
-}
+Process::Process(int id, float a_time, State s, float t)
+        : pid(id), arrivalTime(a_time), state(s), burst(t), remainingTime(t), departureTime(0.0)
+{}
 
 float Process::getRemainingTime()
 {

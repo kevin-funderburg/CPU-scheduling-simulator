@@ -10,6 +10,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <queue>
+#include <list>
 #include <cmath>
 
 #include "event.h"
@@ -19,28 +20,23 @@ using namespace std;
 ////////////////////////////////////////////////////////////////
 #define MAX_PROCESSES 10000
 ////////////////////////////////////////////////////////////////
-//enum EventType {PROCESS_CREATION = 0, DISPATCHED = 1, COMPLETION = 2, PREEMPTED = 3};
-//enum State {READY = 1, RUNNING = 2, TERMINATED = 3};
-enum Scheduler {FCFS = 1, SRTF = 2, RR = 3};
+enum SchedulerType {FCFS = 1, SRTF = 2, RR = 3};
 ////////////////////////////////////////////////////////////////
 //// function definition
 void init();
 int run_sim();
 //void generate_report();
-//int schedule_event(event event);
-float urand();
-float genexp(float);
+
 ////event* newEvent(int, int, float);
 void schedule_event(event * newEvent);
+
+
 ////int schedule_departure(struct event*);
 //////////////////////////////////////////////////////////////////
 //// Global variables
 //event* head; // head of event queue
-priority_queue<event*,
-        std::vector<event *, std::allocator<event*> >,
-        eventComparator> eventQueue;
 float _clock; // simulation clock, added underscore to make unique from system clock
-Scheduler scheduler;
+//Scheduler scheduler;
 //
 //////////////////////////////////////////////////////////////////
 void init()
@@ -63,52 +59,130 @@ void init()
 //
 //}
 ////////////////////////////////////////////////////////////////// //schedules an event in the future
-void schedule_event(event * newEvent)
+class Scheduler
 {
-    eventQueue.push(newEvent);
-}
+public:
+    Scheduler();
+    Scheduler(SchedulerType);
+    SchedulerType schedulerType;
+    typedef std::queue<Process, std::list<Process,
+            std::allocator<Process> > >
+            Pqueue;
+    Pqueue readyQ;
+    Process process_table[MAX_PROCESSES];
+//    queue <Process> readyQ;
+};
+Scheduler::Scheduler() {}
+Scheduler::Scheduler(SchedulerType st) : schedulerType(st), readyQ() {}
 
 class simulation
 {
 public:
-    simulation () : clock(0), eventQueue()
-    {}
+    simulation(float a_rate, float a_st);
     void run();
-    void  scheduleEvent(event * newEvent) {
-        eventQueue.push(newEvent);
-    }
+    float urand();
+    float genexp(float lambda);
+    int genID();
+    void  scheduleEvent(event * newEvent);
+    void scheduleArrival();
+    Scheduler scheduler;
+    // data members
     float clock;
+    float arrivalRate;
+    float avgServiceTime;
+    event *lastArrival;
+    int lastid;
+    int p_count;
+    int p_completed;
+    Process p_table[MAX_PROCESSES];
+    bool running;
 protected:
-    std::priority_queue<event*,
-            std::vector<event *, std::allocator<event*> >,
+    priority_queue<event*,
+            vector<event *, allocator<event*> >,
             eventComparator> eventQueue;
 };
 
+simulation::simulation(float a_rate, float a_st)
+        : clock(0.0), arrivalRate(a_rate), lastArrival(nullptr),
+        lastid(0), p_count(0), p_completed(0), avgServiceTime(a_st),
+        running(true), eventQueue()
+{
+    scheduler = Scheduler(FCFS);  // create scheduler
+    // schedule first events
+    scheduleArrival();
+}
+
+void simulation::scheduleEvent(event * newEvent) { eventQueue.push(newEvent); }
+
+int simulation::genID() { return ++lastid; }
+
+void simulation::scheduleArrival()
+{
+    float timeOffset = 0.0;
+    if (lastArrival != nullptr)
+        timeOffset = lastArrival->time;
+
+    float newEventTime = genexp(arrivalRate) + timeOffset;
+    clog << "event: ARRIVAL\t" << "newEventTime: [" << newEventTime
+         << "]\tcurrent time: [" << clock
+         << "]\tdiff: [" << newEventTime - clock << "]\n";
+
+    Process p = Process(p_count, newEventTime, READY, genexp(avgServiceTime));
+    scheduler.readyQ.push(p);
+
+    p_table[p_count] = p;
+
+    event * newEvent = new event(ARRIVAL, newEventTime);
+    lastArrival = newEvent;
+    eventQueue.push(newEvent);
+}
+
 void simulation::run()
 {
-    while (!eventQueue.empty()) {
-        event * nextEvent = eventQueue.top();
+
+    event *nextEvent;
+    nextEvent = eventQueue.top();
+    clog << "nextEvent: " << nextEvent->type << "\t|\tevent queue length: [" << eventQueue.size() << "]\n";
+    while (p_completed < MAX_PROCESSES)
+    {
+        switch (nextEvent->type)
+        {
+            case ARRIVAL:
+                scheduleArrival();
+                break;
+            case DISPATCHED:
+                ;
+                break;
+            case COMPLETION:
+                ;
+                break;
+            case PREEMPTED:
+                ;
+                break;
+            default:
+                cerr << "invalid event type";
+        }
         eventQueue.pop();
+        clog << "event removed\t|\tevent queue length: [" << eventQueue.size() << "]\n";
         clock = nextEvent->time;
-        nextEvent->processEvent();
-        delete nextEvent;
+
+//        event * nextEvent = eventQueue.top();
+//        eventQueue.pop();
+//        clock = nextEvent->time;
+//        nextEvent->processEvent();
+//        delete nextEvent;
     }
 }
 
-//
-//int delete_event(event *eve)
-//{
-//    return 0;
-//}
 ////////////////////////////////////////////////////////////////
 // returns a random number between 0 and 1
-float urand()
+float simulation::urand()
 {
     return( (float) rand()/RAND_MAX );
 }
 /////////////////////////////////////////////////////////////
 // returns a random number that follows an exp distribution
-float genexp(float lambda)
+float simulation::genexp(float lambda)
 {
     float u,x;
     x = 0;
@@ -119,6 +193,10 @@ float genexp(float lambda)
     }
     return(x);
 }
+
+
+
+
 
 ////int schedule_departure(event *event)
 ////{
@@ -138,7 +216,7 @@ int run_sim()
     while (p_completed < MAX_PROCESSES)
     {
 //        eve = head;
-        _clock = eventQueue.top()->time;
+//        _clock = eventQueue.top()->time;
         cout << "MILLISECONDS: " << _clock << endl;
 //        switch (eve->type)
 //        {
@@ -294,14 +372,15 @@ int main(int argc, char *argv[] )
         show_usage();
         return 1;
     }
-    scheduler = static_cast<Scheduler>(stoi(argv[1]));  // set scheduler algorithm
-    float lambda = 1 / (stoi(argv[2]));                 // 1 / argument is the arrival process time
+    Scheduler scheduler(static_cast<SchedulerType>(stoi(argv[1])));// set scheduler algorithm
+//    scheduler = static_cast<Scheduler>(stoi(argv[1]));  // set scheduler algorithm
+    float lambda = 1 / (stof(argv[2]));                 // 1 / argument is the arrival process time
     float avgServiceTime = stof(argv[3]);
     if (argc == 5)
         float quantum = stof(argv[4]);
 
 //    init();
-    simulation sim;
+    simulation sim(lambda,  avgServiceTime);
     sim.run();
 //    run_sim();
 //    generate_report();
