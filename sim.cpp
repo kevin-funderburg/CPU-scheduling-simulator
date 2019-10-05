@@ -8,7 +8,6 @@
 // avgnumprocesses 1 / lambda * num_proceesses i think
 // Use 105 ms for the preemptive _SRTF
 /////////////////////////////////////////////////
-
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
@@ -19,8 +18,7 @@
 #include "list.h"
 #include "header.h"
 using namespace std;
-
-
+/////////////////////////////////////////////////
 void parseArgs(int argc, char *argv[])
 {
     scheduler = static_cast<Scheduler>(stoi(argv[1]));  // set scheduler algorithm
@@ -211,19 +209,18 @@ void scheduleAllocation()
 
     newAllocation->type = LEAVE_CPU;
     schedule_event_eventQ(newAllocation);
-
 }
 
 
 void handleAllocation()
 {
-
+    //TODO
 }
 
 
 void schedulePreemption()
 {
-
+    //TODO
 }
 
 
@@ -246,7 +243,7 @@ void FCFS() {
     int p_count = 0;
     int allocationCount = 0;
 
-    while (p_completed < MAX_PROCESSES)
+    while (departureCount < MAX_PROCESSES)
     {
         if (!cpuHead->cpuBusy)
         {
@@ -283,13 +280,13 @@ void FCFS() {
 
 void SRTF()
 {
-
+    //TODO
 }
 
 
 void RR()
 {
-
+    //TODO
 }
 
 
