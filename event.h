@@ -7,10 +7,12 @@
 
 enum EventType {ARRIVE = 0, DEPARTURE = 1, LEAVE_CPU = 2, COMPLETION = 3};
 // representation of an event
-struct event {
+struct event
+{
     float time;
     EventType type;
     struct event* next;
+    int pid;
 };
 
 struct eventComparator {

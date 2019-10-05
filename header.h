@@ -1,10 +1,13 @@
-//
-// Created by Kevin Funderburg on 2019-10-04.
-//
+/** \file header.h
+    \brief header file for sim.cpp.
+
+    Authors: Kevin Funderburg, Rob Murray
+*/
 
 #ifndef HEADER_H
 #define HEADER_H
 
+using namespace std;
 #define MAX_PROCESSES 10000
 
 ////////////////////////////////////////////////////////////////
@@ -27,6 +30,7 @@ struct cpuNode
 {
     float clock;
     bool cpuBusy;
+    int pid;
     struct procListNode *pLink;
 };
 
@@ -47,12 +51,14 @@ struct procListNode
 // Global variables
 priority_queue<event*,
         vector<event *, allocator<event*> >,
-eventComparator> eventQueue;
+eventComparator> eventQueue;    ///< priority queue of events
 typedef queue<process, list<process,
         allocator<process> > >
 Pqueue;
 Pqueue readyQ;
 list <process> pList;
+process p_table[MAX_PROCESSES + 200];
+event *lastArrival;
 //event* head; // head of event queue
 Scheduler scheduler;
 int lambda,
@@ -73,7 +79,7 @@ void FCFS();
 void SRTF();
 void RR();
 ////////////////////////////////////////////////////////////////
-// function definition
+// function definitions
 void parseArgs(char *[]);
 void init();
 int run_sim();
@@ -90,6 +96,6 @@ void handleAllocation();
 void schedulePreemption();
 void handleArrival();
 
-void schedule_event_eventQ(event *newEvent);
+void scheduleEvent(event *newEvent);
 
 #endif //HEADER_H

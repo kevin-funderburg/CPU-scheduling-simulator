@@ -1,6 +1,7 @@
 /***
  * CPU Scheduler Simulation
- * Authors: Kevin Funderburg, Rob Murrat
+ * @file sim.cpp
+ * @authors: Kevin Funderburg, Rob Murray
  */
 
 /////////////////////////////////////////////////
@@ -55,18 +56,15 @@ void init()
     p.burst = genexp(avgServiceTime);
     p.remainingTime = p.burst;
     pList.push_back(p);
+    p_table[0] = p;
     lastid = 0;
-//    pHead = new procListNode;
-//    pHead->p.arrivalTime = genexp((float)lambda);
-//    pHead->p.startTime = pHead->p.reStartTime =pHead->p.completionTime = 0.0;
-//    pHead->p.burst = genexp(avgServiceTime);
-//    pHead->p.remainingTime = pHead->p.burst;
-//    pHead->pNext = nullptr;
 
     event *newArrival = new event;
     newArrival->time = p.arrivalTime;
     newArrival->type = ARRIVE;
-    schedule_event_eventQ(newArrival);
+    newArrival->pid = 0;
+    lastArrival = newArrival;
+    scheduleEvent(newArrival);
 }
 
 
@@ -78,12 +76,12 @@ void generate_report()
 }
 
 
-int genID() { return lastid++; }
+int genID() { return ++lastid; }
 
 
-void schedule_event_eventQ(event *newEvent)
+void scheduleEvent(event *newEvent)
 {
-    clog << "event: ";
+    clog << "time: " << cpuHead->clock << "\tevent: ";
     switch (newEvent->type) {
         case ARRIVE: clog << "ARRIVE\n"; break;
         case DEPARTURE: clog << "DEPARTURE\n"; break;
@@ -92,19 +90,21 @@ void schedule_event_eventQ(event *newEvent)
         default: cerr << "invalid type";
     }
     eventQueue.push(newEvent);
+    cout << "\t\tqueue sizes:\n"
+         << "\t\tevent: [" << eventQueue.size()
+         << "]\tready: [" << readyQ.size()
+         << "] process list: " << pList.size() << endl;
+
 }
 
 
 ////////////////////////////////////////////////////////////////
-// returns a random number between 0 and 1
-float urand()
-{
-    return( (float) rand()/RAND_MAX );
-}
+/// @return a random number between 0 and 1
+float urand() { return( (float) rand()/RAND_MAX ); }
 
 
 /////////////////////////////////////////////////////////////
-// returns a random number that follows an exp distribution
+/// @return a random number that follows an exp distribution
 float genexp(float lambda)
 {
     float u,x;
@@ -122,32 +122,26 @@ void scheduleArrival()
 {
     process p;
     p.pid = genID();
-    p.arrivalTime = genexp((float)lambda);
+    p.arrivalTime = lastArrival->time + genexp((float)lambda);
     p.startTime = p.reStartTime = p.completionTime = 0.0;
     p.burst = genexp(avgServiceTime);
     p.remainingTime = p.burst;
+    p_table[p.pid] = p;
     pList.push_back(p);
-//    procListNode *pIt = pHead;
-//    while (pIt->pNext != NULL)
-//        pIt = pIt->pNext;
-//    pIt->pNext = new procListNode;
-//    pIt->pNext->p.arrivalTime = pIt->p.arrivalTime + genexp((float)lambda);
-//    pHead->p.startTime = pHead->p.reStartTime =pHead->p.completionTime = 0.0;
-//    pIt->pNext->p.burst = genexp(avgServiceTime);
-//    pIt->pNext->p.remainingTime = pIt->pNext->p.burst;
-//    pIt->pNext->pNext = NULL;
 
     event *newArrival = new event;
     newArrival->time = p.arrivalTime;
     newArrival->type = ARRIVE;
-    schedule_event_eventQ(newArrival);
+    newArrival->pid = p.pid;
+    lastArrival = newArrival;
+    scheduleEvent(newArrival);
 }
 
 
 void handleArrival()
 {
     //TODO - update process fields
-    process p;
+    process p = p_table[eventQueue.top()->pid];
     readyQ.push(p);     // add process to end of ready queue
     eventQueue.pop();   // remove first event
 }
@@ -159,23 +153,31 @@ void scheduleDeparture()
     newDeparture->type = DEPARTURE;
 
     if (scheduler == _FCFS)
-        newDeparture->time = cpuHead->pLink->p.startTime + cpuHead->pLink->p.remainingTime;
+    {
+        process &p = p_table[cpuHead->pid];
+        newDeparture->time = p.startTime + p.remainingTime;
+        newDeparture->pid = p.pid;
+    }
     else if (scheduler == _SRTF)
     {
         // TODO
     }
 
-    schedule_event_eventQ(newDeparture);
+    scheduleEvent(newDeparture);
 }
 
 
 void handleDeparture()
 {
+    process &p = p_table[eventQueue.top()->pid];
     cpuHead->clock = eventQueue.top()->time;
-    cpuHead->pLink->p.completionTime = cpuHead->clock;
-    pHead->p.completionTime = cpuHead->pLink->p.completionTime;
+    p.completionTime = cpuHead->clock;
 
-    cpuHead->pLink->p.completionTime = 0.0;
+    // i don't think this is necessary when using the table
+    // because im passing the process by reference
+//    pHead->p.completionTime = cpuHead->pLink->p.completionTime;
+
+    p.remainingTime = 0.0;
     cpuHead->pLink = nullptr;
 
     cpuHead->cpuBusy = false;
@@ -192,8 +194,7 @@ void scheduleAllocation()
     switch (scheduler)
     {
         case _FCFS:
-            nextProcess = pList.back();
-//            nextProcess = readyQHead->pLink;
+            nextProcess = p_table[lastid];
             break;
         case _SRTF:
             break;
@@ -208,15 +209,33 @@ void scheduleAllocation()
         newAllocation->time = cpuHead->clock;
 
     newAllocation->type = LEAVE_CPU;
-    schedule_event_eventQ(newAllocation);
+    newAllocation->pid = nextProcess.pid;
+    scheduleEvent(newAllocation);
 }
 
 
 void handleAllocation()
 {
-    //TODO
-}
+    process &p = p_table[eventQueue.top()->pid];
+    cpuHead->pid = p.pid;
+    if (scheduler == _SRTF || scheduler == _RR)
+    {
+        //TODO
+    }
 
+    eventQueue.pop();
+    readyQ.pop();
+
+    cpuHead->cpuBusy = true;
+
+    if (cpuHead->clock < p.arrivalTime)
+        cpuHead->clock = p.arrivalTime;
+
+    if (p.startTime == 0)
+        p.startTime = cpuHead->clock;
+    else
+        p.reStartTime = cpuHead->clock;
+}
 
 void schedulePreemption()
 {
@@ -245,15 +264,16 @@ void FCFS() {
 
     while (departureCount < MAX_PROCESSES)
     {
+        // if CPU is idle, then an arrival event can be scheduled
         if (!cpuHead->cpuBusy)
         {
             scheduleArrival();
-//            if (readyQHead == nullptr)
-            if (readyQ.size() == 0)
+            if (readyQ.empty())
                 scheduleAllocation();
-        } else {
-            scheduleDeparture();
         }
+        // if not idle, the process in the CPU can be scheduled for departure
+        else
+            scheduleDeparture();
 
         switch (eventQueue.top()->type)
         {
