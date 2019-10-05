@@ -14,7 +14,6 @@
 #include <cmath>
 #include <list>
 #include <queue>
-
 #include "event.h"
 #include "header.h"
 using namespace std;
@@ -43,6 +42,7 @@ static void show_usage()
 void init()
 {
     p_completed = 0;
+    _clock = 0.0;
 
     cpuHead = new cpuNode;
     cpuHead->clock = 0.0;
@@ -85,7 +85,7 @@ void addToEventQ(event *newEvent)
     switch (newEvent->type) {
         case ARRIVE: clog << "ARRIVE"; break;
         case DEPARTURE: clog << "DEPARTURE"; break;
-        case LEAVE_CPU: clog << "LEAVE_CPU"; break;
+        case ALLOCATION: clog << "ALLOCATION"; break;
         case COMPLETION: clog << "COMPLETION"; break;
         default: cerr << "invalid type";
     }
@@ -147,17 +147,19 @@ void handleArrival()
 {
     clog << "DEBUG: handleArrival()\n\ttime: " << cpuHead->clock << endl;
     process p = p_table[eventQueue.top()->pid];
-    readyQ.push(p);     // add process to end of ready queue
-    eventQueue.pop();   // remove first event
+    readyQ.push_front(p);       // add process to end of ready queue
+    eventQueue.pop();           // remove first event
 }
 
 
 void scheduleDeparture()
 {
     clog << "DEBUG [" << cpuHead->clock << "] - scheduleDeparture()\n";
+
     event *newDeparture = new event;
     newDeparture->type = DEPARTURE;
     newDeparture->pid = cpuHead->pid;
+
     process p = p_table[newDeparture->pid];
 
     if (scheduler == _FCFS)
@@ -178,19 +180,16 @@ void scheduleDeparture()
 void handleDeparture()
 {
     clog << "DEBUG [" << cpuHead->clock << "]: handleDeparture()\n";
+
     cpuHead->clock = eventQueue.top()->time;
 
     process &p = p_table[eventQueue.top()->pid];
     p.completionTime = cpuHead->clock;
-
-    // i don't think this is necessary when using the table
-    // because im passing the process by reference
-//    pHead->p.completionTime = cpuHead->pLink->p.completionTime;
-
     p.remainingTime = 0.0;
-    cpuHead->pLink = nullptr;
 
+    cpuHead->pLink = nullptr;
     cpuHead->cpuBusy = false;
+    cpuHead->pid = -1;
 
     eventQueue.pop();
     clog << "\t[" << cpuHead->clock << "]\tdeparture event was popped from queue\n";
@@ -202,14 +201,17 @@ void scheduleAllocation()
     clog << "DEBUG [" << cpuHead->clock << "] - scheduleAllocation()\n";
 
     event *newAllocation = new event;
-//    procListNode *nextProcess;
-    process currentProcess = p_table[eventQueue.top()->pid];
-    process nextProcess = p_table[eventQueue.top()->pid + 1];
+    process nextProcess;
+
+//    process currentProcess = p_table[eventQueue.top()->pid];
+//    process nextProcess = p_table[eventQueue.top()->pid + 1];
     switch (scheduler)
     {
         case _FCFS:
-//            nextProcess = p_table[];
-//            nextProcess = p_table[lastid];
+            if (readyQ.empty())
+                nextProcess = p_table[(eventQueue.top()->pid+1)];
+            else
+                nextProcess = readyQ[1];
             break;
         case _SRTF:
             break;
@@ -218,30 +220,37 @@ void scheduleAllocation()
         default:
             cerr << "invalid scheduler\n";
     }
+
     if (cpuHead->clock < nextProcess.arrivalTime)
         newAllocation->time = nextProcess.arrivalTime;
     else
         newAllocation->time = cpuHead->clock;
 
-    newAllocation->type = LEAVE_CPU;
+    newAllocation->type = ALLOCATION;
     newAllocation->pid = nextProcess.pid;
+
     addToEventQ(newAllocation);
 }
 
 
 void handleAllocation()
 {
-    cout << "handlingAllocation\n";
-    cout << "\t\tcpu time: " << cpuHead->clock << endl;
+    clog << "DEBUG [" << cpuHead->clock << "] - handleAllocation()\n";
+    clog << "\tcpuPid before: [" << cpuHead->pid << "]\n";
+
     process &p = p_table[eventQueue.top()->pid];
+
+    // FIXME - this is resetting  back to old ids, biggest problem right now
     cpuHead->pid = p.pid;
+    clog << "\tcpuPid before: [" << cpuHead->pid << "]\n";
+
     if (scheduler == _SRTF || scheduler == _RR)
     {
         //TODO
     }
 
-    eventQueue.pop();
-    readyQ.pop();
+    readyQ.pop_front(); // remove front ready process
+    eventQueue.pop();   // remove top event
 
     cpuHead->cpuBusy = true;
 
@@ -293,8 +302,7 @@ void FCFS() {
             if (readyQ.empty())
                 scheduleAllocation();   // schedule process to be given to CPU
         }
-        // if not idle, the process in the CPU can be scheduled for departure
-        else
+        else // process in the CPU can be scheduled for departure
             scheduleDeparture();
 
         switch (eventQueue.top()->type)
@@ -307,11 +315,9 @@ void FCFS() {
                 handleDeparture();
                 departureCount++;
                 break;
-            case LEAVE_CPU:
+            case ALLOCATION:
                 handleAllocation();
                 allocationCount++;
-                break;
-            case COMPLETION:
                 break;
             default:
                 cerr << "invalid type";

@@ -7,6 +7,8 @@
 #ifndef HEADER_H
 #define HEADER_H
 
+#include <deque>
+#include <list>
 using namespace std;
 #define MAX_PROCESSES 50
 
@@ -49,28 +51,29 @@ struct procListNode
 
 ////////////////////////////////////////////////////////////////
 // Global variables
+//event* head; // head of event queue
 priority_queue<event*,
         vector<event *, allocator<event*> >,
-eventComparator> eventQueue;    ///< priority queue of events
-typedef queue<process, list<process,
-        allocator<process> > >
-Pqueue;
-Pqueue readyQ;
+        eventComparator> eventQueue;    ///< priority queue of events
+
+deque<process> readyQ;
 list <process> pList;
 process p_table[MAX_PROCESSES + 200];
+
 event *lastArrival;
-//event* head; // head of event queue
 Scheduler scheduler;
+
+cpuNode *cpuHead;
+readyQNode *readyQHead;
+procListNode *pHead;
+
 int lambda,
-        p_completed,        // end condition
-        lastid;             // id of last process
+    p_completed,        // end condition
+    lastid;             // id of last process
 float _clock,           // simulation clock
         avgArrivalTime,
         avgServiceTime;
 bool CPUbusy;
-cpuNode *cpuHead;
-readyQNode *readyQHead;
-procListNode *pHead;
 ////////////////////////////////////////////////////////////////
 
 
