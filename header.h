@@ -8,7 +8,7 @@
 #define HEADER_H
 
 using namespace std;
-#define MAX_PROCESSES 10000
+#define MAX_PROCESSES 50
 
 ////////////////////////////////////////////////////////////////
 enum State {READY = 0, RUNNING = 1, TERMINATED = 3};
@@ -96,6 +96,6 @@ void handleAllocation();
 void schedulePreemption();
 void handleArrival();
 
-void scheduleEvent(event *newEvent);
+void addToEventQ(event *newEvent);
 
 #endif //HEADER_H

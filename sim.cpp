@@ -16,7 +16,6 @@
 #include <queue>
 
 #include "event.h"
-#include "list.h"
 #include "header.h"
 using namespace std;
 /////////////////////////////////////////////////
@@ -52,6 +51,7 @@ void init()
     process p;
     p.pid = 0;
     p.arrivalTime = genexp((float)lambda);
+    p.state = READY;
     p.startTime = p.reStartTime = p.completionTime = 0.0;
     p.burst = genexp(avgServiceTime);
     p.remainingTime = p.burst;
@@ -64,7 +64,7 @@ void init()
     newArrival->type = ARRIVE;
     newArrival->pid = 0;
     lastArrival = newArrival;
-    scheduleEvent(newArrival);
+    addToEventQ(newArrival);
 }
 
 
@@ -79,22 +79,25 @@ void generate_report()
 int genID() { return ++lastid; }
 
 
-void scheduleEvent(event *newEvent)
+void addToEventQ(event *newEvent)
 {
-    clog << "time: " << cpuHead->clock << "\tevent: ";
+    clog  << "DEBUG [" << cpuHead->clock << "] - adding event: ";
     switch (newEvent->type) {
-        case ARRIVE: clog << "ARRIVE\n"; break;
-        case DEPARTURE: clog << "DEPARTURE\n"; break;
-        case LEAVE_CPU: clog << "LEAVE_CPU\n"; break;
-        case COMPLETION: clog << "COMPLETION\n"; break;
+        case ARRIVE: clog << "ARRIVE"; break;
+        case DEPARTURE: clog << "DEPARTURE"; break;
+        case LEAVE_CPU: clog << "LEAVE_CPU"; break;
+        case COMPLETION: clog << "COMPLETION"; break;
         default: cerr << "invalid type";
     }
-    eventQueue.push(newEvent);
-    cout << "\t\tqueue sizes:\n"
-         << "\t\tevent: [" << eventQueue.size()
-         << "]\tready: [" << readyQ.size()
-         << "] process list: " << pList.size() << endl;
+    clog << "\n\twill happen at time: [" << newEvent->time << "]\n"
+         << "\tattached to process id: [" << newEvent->pid << "]\n";
 
+    eventQueue.push(newEvent);
+
+    clog << "\n\tQUEUE SIZES:"
+         << "\tevent: [" << eventQueue.size()
+         << "]\tready: [" << readyQ.size()
+         << "] process list: [" << pList.size() << "]\n";
 }
 
 
@@ -122,7 +125,9 @@ void scheduleArrival()
 {
     process p;
     p.pid = genID();
-    p.arrivalTime = lastArrival->time + genexp((float)lambda);
+//    float timeOffset = lastArrival->time + genexp((float)lambda);
+    p.arrivalTime = cpuHead->clock + lastArrival->time + genexp((float)lambda);
+    p.state = READY;
     p.startTime = p.reStartTime = p.completionTime = 0.0;
     p.burst = genexp(avgServiceTime);
     p.remainingTime = p.burst;
@@ -134,13 +139,13 @@ void scheduleArrival()
     newArrival->type = ARRIVE;
     newArrival->pid = p.pid;
     lastArrival = newArrival;
-    scheduleEvent(newArrival);
+    addToEventQ(newArrival);
 }
 
 
 void handleArrival()
 {
-    //TODO - update process fields
+    clog << "DEBUG: handleArrival()\n\ttime: " << cpuHead->clock << endl;
     process p = p_table[eventQueue.top()->pid];
     readyQ.push(p);     // add process to end of ready queue
     eventQueue.pop();   // remove first event
@@ -149,28 +154,33 @@ void handleArrival()
 
 void scheduleDeparture()
 {
+    clog << "DEBUG [" << cpuHead->clock << "] - scheduleDeparture()\n";
     event *newDeparture = new event;
     newDeparture->type = DEPARTURE;
+    newDeparture->pid = cpuHead->pid;
+    process p = p_table[newDeparture->pid];
 
     if (scheduler == _FCFS)
     {
-        process &p = p_table[cpuHead->pid];
         newDeparture->time = p.startTime + p.remainingTime;
         newDeparture->pid = p.pid;
+        clog << "\tnew departure event time set to: [" << newDeparture->time << "]\twith pid [" << newDeparture->pid << "]\n";
     }
     else if (scheduler == _SRTF)
     {
         // TODO
     }
 
-    scheduleEvent(newDeparture);
+    addToEventQ(newDeparture);
 }
 
 
 void handleDeparture()
 {
-    process &p = p_table[eventQueue.top()->pid];
+    clog << "DEBUG [" << cpuHead->clock << "]: handleDeparture()\n";
     cpuHead->clock = eventQueue.top()->time;
+
+    process &p = p_table[eventQueue.top()->pid];
     p.completionTime = cpuHead->clock;
 
     // i don't think this is necessary when using the table
@@ -183,18 +193,23 @@ void handleDeparture()
     cpuHead->cpuBusy = false;
 
     eventQueue.pop();
+    clog << "\t[" << cpuHead->clock << "]\tdeparture event was popped from queue\n";
 }
 
 
 void scheduleAllocation()
 {
+    clog << "DEBUG [" << cpuHead->clock << "] - scheduleAllocation()\n";
+
     event *newAllocation = new event;
 //    procListNode *nextProcess;
-    process nextProcess;
+    process currentProcess = p_table[eventQueue.top()->pid];
+    process nextProcess = p_table[eventQueue.top()->pid + 1];
     switch (scheduler)
     {
         case _FCFS:
-            nextProcess = p_table[lastid];
+//            nextProcess = p_table[];
+//            nextProcess = p_table[lastid];
             break;
         case _SRTF:
             break;
@@ -210,12 +225,14 @@ void scheduleAllocation()
 
     newAllocation->type = LEAVE_CPU;
     newAllocation->pid = nextProcess.pid;
-    scheduleEvent(newAllocation);
+    addToEventQ(newAllocation);
 }
 
 
 void handleAllocation()
 {
+    cout << "handlingAllocation\n";
+    cout << "\t\tcpu time: " << cpuHead->clock << endl;
     process &p = p_table[eventQueue.top()->pid];
     cpuHead->pid = p.pid;
     if (scheduler == _SRTF || scheduler == _RR)
@@ -228,13 +245,17 @@ void handleAllocation()
 
     cpuHead->cpuBusy = true;
 
+    // this represents the cpu starting to work on the process
+    // at its arrival time
     if (cpuHead->clock < p.arrivalTime)
         cpuHead->clock = p.arrivalTime;
-
+    // the start time of processing is now set
     if (p.startTime == 0)
         p.startTime = cpuHead->clock;
     else
         p.reStartTime = cpuHead->clock;
+
+    cout << "\t\tcpu time: " << cpuHead->clock << endl;
 }
 
 void schedulePreemption()
@@ -264,12 +285,13 @@ void FCFS() {
 
     while (departureCount < MAX_PROCESSES)
     {
+        clog << "\n\nDEBUG [" << cpuHead->clock << "] ----------------- loop start\n\n";
         // if CPU is idle, then an arrival event can be scheduled
         if (!cpuHead->cpuBusy)
         {
             scheduleArrival();
             if (readyQ.empty())
-                scheduleAllocation();
+                scheduleAllocation();   // schedule process to be given to CPU
         }
         // if not idle, the process in the CPU can be scheduled for departure
         else
@@ -295,6 +317,9 @@ void FCFS() {
                 cerr << "invalid type";
         }
     }
+    cout << "Arrival Count: " << p_count << endl;
+    cout << "Departure Count: " << departureCount << endl;
+    cout << "Allocation Count: " << allocationCount << endl;
 }
 
 
