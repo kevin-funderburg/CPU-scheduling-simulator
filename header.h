@@ -14,11 +14,13 @@ enum Scheduler {_FCFS = 1, _SRTF = 2, _RR = 3};
 struct process
 {
     int pid;                // process ID
-    int arrivalTime;        // arrival time
-    float burst;            // service time
     State state;            // process state
-    float remainingTime;    // time left for execution
-    // TODO - add stats
+    float arrivalTime,      // arrival time
+          startTime,        // time started in CPU
+          reStartTime,      // time back in CPU
+          burst,            // service time
+          remainingTime,    // time remaining until completion
+          completionTime;   // process completion
 };
 
 struct cpuNode

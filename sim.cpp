@@ -10,7 +10,9 @@
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
+#include <list>
 #include <queue>
+
 #include "event.h"
 #include "list.h"
 #include "header.h"
@@ -24,6 +26,13 @@ using namespace std;
 
 ////////////////////////////////////////////////////////////////
 // Global variables
+typedef queue<process, list<process,
+        allocator<process> > >
+        Pqueue;
+Pqueue readyQ;
+
+list <process> pList;
+
 priority_queue<event*,
         vector<event *, allocator<event*> >,
         eventComparator> eventQueue;
@@ -36,6 +45,7 @@ float avgArrivalTime;
 float avgServiceTime;
 cpuNode *cpuHead;
 readyQNode *readyQHead;
+procListNode *pHead;
 ////////////////////////////////////////////////////////////////
 
 void parseArgs(int argc, char *argv[])
@@ -62,6 +72,24 @@ void init()
     cpuHead = new cpuNode;
     cpuHead->clock = 0.0;
     cpuHead->cpuBusy = false;
+
+    process p;
+    p.arrivalTime = genexp((float)lambda);
+    p.startTime = p.reStartTime = p.completionTime = 0.0;
+    p.burst = genexp(avgServiceTime);
+    p.remainingTime = p.burst;
+    pList.push_front(p);
+//    pHead = new procListNode;
+//    pHead->p.arrivalTime = genexp((float)lambda);
+//    pHead->p.startTime = pHead->p.reStartTime =pHead->p.completionTime = 0.0;
+//    pHead->p.burst = genexp(avgServiceTime);
+//    pHead->p.remainingTime = pHead->p.burst;
+//    pHead->pNext = nullptr;
+
+    event *newArrival = new event;
+    newArrival->time = pHead->p.arrivalTime;
+    newArrival->type = ARRIVE;
+    schedule_event_eventQ(newArrival);
 }
 ////////////////////////////////////////////////////////////////
 void generate_report()
@@ -72,8 +100,16 @@ void generate_report()
 
 void schedule_event_eventQ(event *newEvent)
 {
+    clog << "event: ";
+    switch (newEvent->type) {
+        case ARRIVE: clog << "ARRIVE\n"; break;
+        case IN_CPU: clog << "IN_CPU\n"; break;
+        case LEAVE_CPU: clog << "LEAVE_CPU\n"; break;
+        case COMPLETION: clog << "COMPLETION\n"; break;
+        default: cerr << "invalid type";
+    }
     eventQueue.push(newEvent);
-};
+}
 
 ////////////////////////////////////////////////////////////////
 // returns a random number between 0 and 1
@@ -97,7 +133,20 @@ float genexp(float lambda)
 
 void scheduleArrival()
 {
+    procListNode *pIt = pHead;
+    while (pIt->pNext != NULL)
+        pIt = pIt->pNext;
+    pIt->pNext = new procListNode;
+    pIt->pNext->p.arrivalTime = pIt->p.arrivalTime + genexp((float)lambda);
+    pHead->p.startTime = pHead->p.reStartTime =pHead->p.completionTime = 0.0;
+    pIt->pNext->p.burst = genexp(avgServiceTime);
+    pIt->pNext->p.remainingTime = pIt->pNext->p.burst;
+    pIt->pNext->pNext = NULL;
 
+    event *newArrival = new event;
+    newArrival->time = pIt->pNext->p.arrivalTime;
+    newArrival->type = ARRIVE;
+    schedule_event_eventQ(newArrival);
 }
 
 void scheduleDeparture()
@@ -112,7 +161,8 @@ void scheduleAllocation()
     switch (scheduler)
     {
         case _FCFS:
-            nextProcess = readyQHead->pLink;
+
+//            nextProcess = readyQHead->pLink;
             break;
         case _SRTF:
             break;
@@ -133,7 +183,10 @@ void scheduleAllocation()
 
 void handleArrival()
 {
-
+    //TODO - update process fields
+    process p;
+    readyQ.push(p);     // add process to end of ready queue
+    eventQueue.pop();   // remove first event
 }
 void schedulePreemption()
 {
@@ -145,21 +198,10 @@ int run_sim()
 {
     switch (scheduler)
     {
-        case _FCFS:
-            cout << "Scheduling as FCFS\n\n";
-            FCFS();
-            break;
-        case _SRTF:
-            cout << "Scheduling as SRTF\n\n";
-            SRTF();
-            break;
-        case _RR:
-            cout << "Scheduling as RR\n\n";
-            RR();
-            break;
-        default:
-            cerr << "invalid scheduler\n";
-            return 1;
+        case _FCFS: cout << "Scheduling as FCFS\n\n";  FCFS(); break;
+        case _SRTF: cout << "Scheduling as SRTF\n\n";  SRTF(); break;
+        case _RR:   cout << "Scheduling as RR\n\n";    RR();   break;
+        default:    cerr << "invalid scheduler\n";     return 1;
     }
     return 0;
 }
