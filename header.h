@@ -42,6 +42,32 @@ struct procListNode
     struct procListNode *pNext;
 };
 
+
+////////////////////////////////////////////////////////////////
+// Global variables
+priority_queue<event*,
+        vector<event *, allocator<event*> >,
+eventComparator> eventQueue;
+typedef queue<process, list<process,
+        allocator<process> > >
+Pqueue;
+Pqueue readyQ;
+list <process> pList;
+//event* head; // head of event queue
+Scheduler scheduler;
+int lambda,
+        p_completed,        // end condition
+        lastid;             // id of last process
+float _clock,           // simulation clock
+        avgArrivalTime,
+        avgServiceTime;
+bool CPUbusy;
+cpuNode *cpuHead;
+readyQNode *readyQHead;
+procListNode *pHead;
+////////////////////////////////////////////////////////////////
+
+
 /* Scheduling Algorithms */
 void FCFS();
 void SRTF();
@@ -52,16 +78,15 @@ void parseArgs(char *[]);
 void init();
 int run_sim();
 void generate_report();
-//int schedule_event(struct event*);
 float urand();
 float genexp(float);
 process newProcess(int);
 event* newEvent(int, int, float);
-int process_event2(struct event* eve);
 
 void scheduleArrival();
 void scheduleDeparture();
 void scheduleAllocation();
+void handleAllocation();
 void schedulePreemption();
 void handleArrival();
 

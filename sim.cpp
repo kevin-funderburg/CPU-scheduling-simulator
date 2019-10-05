@@ -2,11 +2,13 @@
  * CPU Scheduler Simulation
  * Authors: Kevin Funderburg, Rob Murrat
  */
+
 /////////////////////////////////////////////////
-// TODO - Add a Process Ready Queue
-// ASKPROF - can we use priority queue from stdlib?
+// NOTES
+// avgnumprocesses 1 / lambda * num_proceesses i think
 // Use 105 ms for the preemptive _SRTF
 /////////////////////////////////////////////////
+
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
@@ -17,36 +19,7 @@
 #include "list.h"
 #include "header.h"
 using namespace std;
-///////////////////////////////////////////////////////////////
 
-// NOTES
-// avgnumprocesses 1 / lambda * num_proceesses i think
-
-
-
-////////////////////////////////////////////////////////////////
-// Global variables
-typedef queue<process, list<process,
-        allocator<process> > >
-        Pqueue;
-Pqueue readyQ;
-
-list <process> pList;
-
-priority_queue<event*,
-        vector<event *, allocator<event*> >,
-        eventComparator> eventQueue;
-//event* head; // head of event queue
-float _clock; // simulation clock, added underscore to make unique from system clock
-Scheduler scheduler;
-bool CPUbusy;
-int lambda;
-float avgArrivalTime;
-float avgServiceTime;
-cpuNode *cpuHead;
-readyQNode *readyQHead;
-procListNode *pHead;
-////////////////////////////////////////////////////////////////
 
 void parseArgs(int argc, char *argv[])
 {
@@ -58,6 +31,7 @@ void parseArgs(int argc, char *argv[])
         float quantum = stof(argv[4]);
 }
 
+
 static void show_usage()
 {
     cerr << "Usage: sim [123] [average arrival rate] [average service time] [quantum interval]\n\n"
@@ -67,18 +41,23 @@ static void show_usage()
          << "\t3 : Round Robin, with different quantum values (_RR) (requires 4 arguments)\n";
 }
 
+
 void init()
 {
+    p_completed = 0;
+
     cpuHead = new cpuNode;
     cpuHead->clock = 0.0;
     cpuHead->cpuBusy = false;
 
     process p;
+    p.pid = 0;
     p.arrivalTime = genexp((float)lambda);
     p.startTime = p.reStartTime = p.completionTime = 0.0;
     p.burst = genexp(avgServiceTime);
     p.remainingTime = p.burst;
-    pList.push_front(p);
+    pList.push_back(p);
+    lastid = 0;
 //    pHead = new procListNode;
 //    pHead->p.arrivalTime = genexp((float)lambda);
 //    pHead->p.startTime = pHead->p.reStartTime =pHead->p.completionTime = 0.0;
@@ -87,10 +66,12 @@ void init()
 //    pHead->pNext = nullptr;
 
     event *newArrival = new event;
-    newArrival->time = pHead->p.arrivalTime;
+    newArrival->time = p.arrivalTime;
     newArrival->type = ARRIVE;
     schedule_event_eventQ(newArrival);
 }
+
+
 ////////////////////////////////////////////////////////////////
 void generate_report()
 {
@@ -98,12 +79,16 @@ void generate_report()
     clog << "outputting stats\n";
 }
 
+
+int genID() { return lastid++; }
+
+
 void schedule_event_eventQ(event *newEvent)
 {
     clog << "event: ";
     switch (newEvent->type) {
         case ARRIVE: clog << "ARRIVE\n"; break;
-        case IN_CPU: clog << "IN_CPU\n"; break;
+        case DEPARTURE: clog << "DEPARTURE\n"; break;
         case LEAVE_CPU: clog << "LEAVE_CPU\n"; break;
         case COMPLETION: clog << "COMPLETION\n"; break;
         default: cerr << "invalid type";
@@ -111,12 +96,15 @@ void schedule_event_eventQ(event *newEvent)
     eventQueue.push(newEvent);
 }
 
+
 ////////////////////////////////////////////////////////////////
 // returns a random number between 0 and 1
 float urand()
 {
     return( (float) rand()/RAND_MAX );
 }
+
+
 /////////////////////////////////////////////////////////////
 // returns a random number that follows an exp distribution
 float genexp(float lambda)
@@ -131,37 +119,82 @@ float genexp(float lambda)
     return(x);
 }
 
+
 void scheduleArrival()
 {
-    procListNode *pIt = pHead;
-    while (pIt->pNext != NULL)
-        pIt = pIt->pNext;
-    pIt->pNext = new procListNode;
-    pIt->pNext->p.arrivalTime = pIt->p.arrivalTime + genexp((float)lambda);
-    pHead->p.startTime = pHead->p.reStartTime =pHead->p.completionTime = 0.0;
-    pIt->pNext->p.burst = genexp(avgServiceTime);
-    pIt->pNext->p.remainingTime = pIt->pNext->p.burst;
-    pIt->pNext->pNext = NULL;
+    process p;
+    p.pid = genID();
+    p.arrivalTime = genexp((float)lambda);
+    p.startTime = p.reStartTime = p.completionTime = 0.0;
+    p.burst = genexp(avgServiceTime);
+    p.remainingTime = p.burst;
+    pList.push_back(p);
+//    procListNode *pIt = pHead;
+//    while (pIt->pNext != NULL)
+//        pIt = pIt->pNext;
+//    pIt->pNext = new procListNode;
+//    pIt->pNext->p.arrivalTime = pIt->p.arrivalTime + genexp((float)lambda);
+//    pHead->p.startTime = pHead->p.reStartTime =pHead->p.completionTime = 0.0;
+//    pIt->pNext->p.burst = genexp(avgServiceTime);
+//    pIt->pNext->p.remainingTime = pIt->pNext->p.burst;
+//    pIt->pNext->pNext = NULL;
 
     event *newArrival = new event;
-    newArrival->time = pIt->pNext->p.arrivalTime;
+    newArrival->time = p.arrivalTime;
     newArrival->type = ARRIVE;
     schedule_event_eventQ(newArrival);
 }
 
+
+void handleArrival()
+{
+    //TODO - update process fields
+    process p;
+    readyQ.push(p);     // add process to end of ready queue
+    eventQueue.pop();   // remove first event
+}
+
+
 void scheduleDeparture()
 {
+    event *newDeparture = new event;
+    newDeparture->type = DEPARTURE;
 
+    if (scheduler == _FCFS)
+        newDeparture->time = cpuHead->pLink->p.startTime + cpuHead->pLink->p.remainingTime;
+    else if (scheduler == _SRTF)
+    {
+        // TODO
+    }
+
+    schedule_event_eventQ(newDeparture);
 }
+
+
+void handleDeparture()
+{
+    cpuHead->clock = eventQueue.top()->time;
+    cpuHead->pLink->p.completionTime = cpuHead->clock;
+    pHead->p.completionTime = cpuHead->pLink->p.completionTime;
+
+    cpuHead->pLink->p.completionTime = 0.0;
+    cpuHead->pLink = nullptr;
+
+    cpuHead->cpuBusy = false;
+
+    eventQueue.pop();
+}
+
 
 void scheduleAllocation()
 {
     event *newAllocation = new event;
-    procListNode *nextProcess;
+//    procListNode *nextProcess;
+    process nextProcess;
     switch (scheduler)
     {
         case _FCFS:
-
+            nextProcess = pList.back();
 //            nextProcess = readyQHead->pLink;
             break;
         case _SRTF:
@@ -171,8 +204,8 @@ void scheduleAllocation()
         default:
             cerr << "invalid scheduler\n";
     }
-    if (cpuHead->clock < nextProcess->p.arrivalTime)
-        newAllocation->time = nextProcess->p.arrivalTime;
+    if (cpuHead->clock < nextProcess.arrivalTime)
+        newAllocation->time = nextProcess.arrivalTime;
     else
         newAllocation->time = cpuHead->clock;
 
@@ -181,17 +214,18 @@ void scheduleAllocation()
 
 }
 
-void handleArrival()
+
+void handleAllocation()
 {
-    //TODO - update process fields
-    process p;
-    readyQ.push(p);     // add process to end of ready queue
-    eventQueue.pop();   // remove first event
+
 }
+
+
 void schedulePreemption()
 {
 
 }
+
 
 ////////////////////////////////////////////////////////////
 int run_sim()
@@ -206,26 +240,9 @@ int run_sim()
     return 0;
 }
 
-process newProcess(int index)
-{
-    process p;
-    p.pid = index;
-    p.arrivalTime = index;
-    p.burst = p.remainingTime = genexp(lambda);
-    p.state = READY;
-    return p;
-}
-
-event* newEvent(int pid, EventType type, float time)
-{
-    event *newEvent = new event;
-    newEvent->type = type;
-    newEvent->time = time;
-    return newEvent;
-}
 
 void FCFS() {
-    int p_completed = 0;
+    int departureCount = 0;
     int p_count = 0;
     int allocationCount = 0;
 
@@ -234,7 +251,8 @@ void FCFS() {
         if (!cpuHead->cpuBusy)
         {
             scheduleArrival();
-            if (readyQHead == nullptr)
+//            if (readyQHead == nullptr)
+            if (readyQ.size() == 0)
                 scheduleAllocation();
         } else {
             scheduleDeparture();
@@ -246,14 +264,15 @@ void FCFS() {
                 handleArrival();
                 p_count++;
                 break;
-            case IN_CPU:
-                ;
+            case DEPARTURE:
+                handleDeparture();
+                departureCount++;
                 break;
             case LEAVE_CPU:
-                ;
+                handleAllocation();
+                allocationCount++;
                 break;
             case COMPLETION:
-                ;
                 break;
             default:
                 cerr << "invalid type";
@@ -261,15 +280,18 @@ void FCFS() {
     }
 }
 
+
 void SRTF()
 {
 
 }
 
+
 void RR()
 {
 
 }
+
 
 ////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[] )

@@ -5,7 +5,7 @@
 #ifndef EVENT_H
 #define EVENT_H
 
-enum EventType {ARRIVE = 0, IN_CPU = 1, LEAVE_CPU = 2, COMPLETION = 3};
+enum EventType {ARRIVE = 0, DEPARTURE = 1, LEAVE_CPU = 2, COMPLETION = 3};
 // representation of an event
 struct event {
     float time;
