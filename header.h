@@ -11,7 +11,8 @@
 enum State {READY = 0, RUNNING = 1, TERMINATED = 3};
 enum Scheduler {_FCFS = 1, _SRTF = 2, _RR = 3};
 ////////////////////////////////////////////////////////////////
-struct process {
+struct process
+{
     int pid;                // process ID
     int arrivalTime;        // arrival time
     float burst;            // service time
@@ -20,6 +21,26 @@ struct process {
     // TODO - add stats
 };
 
+struct cpuNode
+{
+    float clock;
+    bool cpuBusy;
+    struct procListNode *pLink;
+};
+
+struct readyQNode
+{
+    struct procListNode *pLink;
+    struct readyQNode *rNext;
+};
+
+struct procListNode
+{
+    process p;
+    struct procListNode *pNext;
+};
+
+/* Scheduling Algorithms */
 void FCFS();
 void SRTF();
 void RR();
@@ -29,8 +50,7 @@ void parseArgs(char *[]);
 void init();
 int run_sim();
 void generate_report();
-int schedule_event(struct event*);
-int delete_event(struct event* eve);
+//int schedule_event(struct event*);
 float urand();
 float genexp(float);
 process newProcess(int);
@@ -41,6 +61,8 @@ void scheduleArrival();
 void scheduleDeparture();
 void scheduleAllocation();
 void schedulePreemption();
+void handleArrival();
+
 void schedule_event_eventQ(event *newEvent);
 
 #endif //HEADER_H
