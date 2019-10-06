@@ -47,6 +47,8 @@ void init()
     cpuHead = new cpuNode;
     cpuHead->clock = 0.0;
     cpuHead->cpuBusy = false;
+    cpuHead->pLink = nullptr;
+    cpuHead->departureScheduled = false;
 
     process p;
     p.pid = 0;
@@ -62,7 +64,7 @@ void init()
     event *newArrival = new event;
     newArrival->time = p.arrivalTime;
     newArrival->type = ARRIVE;
-    newArrival->pid = 0;
+    newArrival->pid = p.pid;
     lastArrival = newArrival;
     addToEventQ(newArrival);
 }
@@ -81,6 +83,13 @@ int genID() { return ++lastid; }
 
 void addToEventQ(event *newEvent)
 {
+    debugging(newEvent);
+    eventQ.push(newEvent);
+}
+
+
+void debugging(event *newEvent)
+{
     clog  << "DEBUG [" << cpuHead->clock << "] - adding event: ";
     switch (newEvent->type) {
         case ARRIVE: clog << "ARRIVE"; break;
@@ -92,10 +101,8 @@ void addToEventQ(event *newEvent)
     clog << "\n\twill happen at time: [" << newEvent->time << "]\n"
          << "\tattached to process id: [" << newEvent->pid << "]\n";
 
-    eventQueue.push(newEvent);
-
     clog << "\n\tQUEUE SIZES:"
-         << "\tevent: [" << eventQueue.size()
+         << "\tevent: [" << eventQ.size()
          << "]\tready: [" << readyQ.size()
          << "] process list: [" << pList.size() << "]\n";
 }
@@ -126,7 +133,8 @@ void scheduleArrival()
     process p;
     p.pid = genID();
 //    float timeOffset = lastArrival->time + genexp((float)lambda);
-    p.arrivalTime = cpuHead->clock + lastArrival->time + genexp((float)lambda);
+    p.arrivalTime = p_table[p.pid-1].arrivalTime + genexp((float)lambda);
+//    p.arrivalTime = cpuHead->clock + lastArrival->time + genexp((float)lambda);
     p.state = READY;
     p.startTime = p.reStartTime = p.completionTime = 0.0;
     p.burst = genexp(avgServiceTime);
@@ -146,9 +154,9 @@ void scheduleArrival()
 void handleArrival()
 {
     clog << "DEBUG: handleArrival()\n\ttime: " << cpuHead->clock << endl;
-    process p = p_table[eventQueue.top()->pid];
+    process &p = p_table[eventQ.top()->pid];
     readyQ.push_front(p);       // add process to end of ready queue
-    eventQueue.pop();           // remove first event
+    eventQ.pop();               // remove first event
 }
 
 
@@ -159,13 +167,13 @@ void scheduleDeparture()
     event *newDeparture = new event;
     newDeparture->type = DEPARTURE;
     newDeparture->pid = cpuHead->pid;
+    cpuHead->departureScheduled = true;
 
-    process p = p_table[newDeparture->pid];
+    process &p = p_table[newDeparture->pid];
 
     if (scheduler == _FCFS)
     {
         newDeparture->time = p.startTime + p.remainingTime;
-        newDeparture->pid = p.pid;
         clog << "\tnew departure event time set to: [" << newDeparture->time << "]\twith pid [" << newDeparture->pid << "]\n";
     }
     else if (scheduler == _SRTF)
@@ -181,17 +189,18 @@ void handleDeparture()
 {
     clog << "DEBUG [" << cpuHead->clock << "]: handleDeparture()\n";
 
-    cpuHead->clock = eventQueue.top()->time;
+    cpuHead->clock = eventQ.top()->time;
 
-    process &p = p_table[eventQueue.top()->pid];
+    process &p = p_table[eventQ.top()->pid];
     p.completionTime = cpuHead->clock;
     p.remainingTime = 0.0;
 
     cpuHead->pLink = nullptr;
     cpuHead->cpuBusy = false;
-    cpuHead->pid = -1;
+    cpuHead->pid = NULL;
+    cpuHead->departureScheduled = false;
 
-    eventQueue.pop();
+    eventQ.pop();
     clog << "\t[" << cpuHead->clock << "]\tdeparture event was popped from queue\n";
 }
 
@@ -203,13 +212,13 @@ void scheduleAllocation()
     event *newAllocation = new event;
     process nextProcess;
 
-//    process currentProcess = p_table[eventQueue.top()->pid];
-//    process nextProcess = p_table[eventQueue.top()->pid + 1];
+//    process currentProcess = p_table[eventQ.top()->pid];
+//    process nextProcess = p_table[eventQ.top()->pid + 1];
     switch (scheduler)
     {
         case _FCFS:
             if (readyQ.empty())
-                nextProcess = p_table[(eventQueue.top()->pid+1)];
+                nextProcess = p_table[(eventQ.top()->pid+1)];
             else
                 nextProcess = readyQ[1];
             break;
@@ -238,11 +247,11 @@ void handleAllocation()
     clog << "DEBUG [" << cpuHead->clock << "] - handleAllocation()\n";
     clog << "\tcpuPid before: [" << cpuHead->pid << "]\n";
 
-    process &p = p_table[eventQueue.top()->pid];
+    process &p = p_table[eventQ.top()->pid];
 
     // FIXME - this is resetting  back to old ids, biggest problem right now
     cpuHead->pid = p.pid;
-    clog << "\tcpuPid before: [" << cpuHead->pid << "]\n";
+    clog << "\tcpuPid after: [" << cpuHead->pid << "]\n";
 
     if (scheduler == _SRTF || scheduler == _RR)
     {
@@ -250,12 +259,11 @@ void handleAllocation()
     }
 
     readyQ.pop_front(); // remove front ready process
-    eventQueue.pop();   // remove top event
+    eventQ.pop();   // remove top event
 
     cpuHead->cpuBusy = true;
 
-    // this represents the cpu starting to work on the process
-    // at its arrival time
+    // this represents the cpu starting to work on the process at its arrival time
     if (cpuHead->clock < p.arrivalTime)
         cpuHead->clock = p.arrivalTime;
     // the start time of processing is now set
@@ -287,14 +295,16 @@ int run_sim()
 }
 
 
-void FCFS() {
-    int departureCount = 0;
+void FCFS()
+{
     int p_count = 0;
+    int departureCount = 0;
     int allocationCount = 0;
 
     while (departureCount < MAX_PROCESSES)
     {
         clog << "\n\nDEBUG [" << cpuHead->clock << "] ----------------- loop start\n\n";
+        _clock = eventQ.top()->time;
         // if CPU is idle, then an arrival event can be scheduled
         if (!cpuHead->cpuBusy)
         {
@@ -303,9 +313,13 @@ void FCFS() {
                 scheduleAllocation();   // schedule process to be given to CPU
         }
         else // process in the CPU can be scheduled for departure
-            scheduleDeparture();
+        {
+            if (!cpuHead->departureScheduled)
+                scheduleDeparture();
+        }
 
-        switch (eventQueue.top()->type)
+
+        switch (eventQ.top()->type)
         {
             case ARRIVE:
                 handleArrival();

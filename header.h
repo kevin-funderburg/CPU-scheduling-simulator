@@ -10,7 +10,7 @@
 #include <deque>
 #include <list>
 using namespace std;
-#define MAX_PROCESSES 50
+#define MAX_PROCESSES 5
 
 ////////////////////////////////////////////////////////////////
 enum State {READY = 0, RUNNING = 1, TERMINATED = 3};
@@ -33,6 +33,7 @@ struct cpuNode
     float clock;
     bool cpuBusy;
     int pid;
+    bool departureScheduled;
     struct procListNode *pLink;
 };
 
@@ -54,7 +55,7 @@ struct procListNode
 //event* head; // head of event queue
 priority_queue<event*,
         vector<event *, allocator<event*> >,
-        eventComparator> eventQueue;    ///< priority queue of events
+        eventComparator> eventQ;    ///< priority queue of events
 
 deque<process> readyQ;
 list <process> pList;
@@ -98,7 +99,7 @@ void scheduleAllocation();
 void handleAllocation();
 void schedulePreemption();
 void handleArrival();
-
+void debugging(event *newEvent);
 void addToEventQ(event *newEvent);
 
 #endif //HEADER_H
