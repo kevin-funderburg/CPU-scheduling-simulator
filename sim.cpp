@@ -20,7 +20,7 @@ using namespace std;
 /////////////////////////////////////////////////
 void parseArgs(int argc, char *argv[])
 {
-    scheduler = static_cast<Scheduler>(stoi(argv[1]));  // set scheduler algorithm
+    schedulerType = static_cast<Scheduler>(stoi(argv[1]));  // set schedulerType algorithm
     lambda = (stoi(argv[2]));                 // 1 / argument is the arrival process time
     avgArrivalTime = 1 / (float)lambda;
     avgServiceTime = stof(argv[3]);
@@ -41,32 +41,25 @@ static void show_usage()
 
 void init()
 {
-    p_completed = 0;
-    _clock = 0.0;
-
+    mu = (float)1.0 / avgTs;
+    quantumClock = 0.0;
     cpuHead = new cpuNode;
     cpuHead->clock = 0.0;
-    cpuHead->cpuBusy = false;
-    cpuHead->pLink = nullptr;
-    cpuHead->departureScheduled = false;
-
-    process p;
-    p.pid = 0;
-    p.arrivalTime = genexp((float)lambda);
-    p.state = READY;
-    p.startTime = p.reStartTime = p.completionTime = 0.0;
-    p.burst = genexp(avgServiceTime);
-    p.remainingTime = p.burst;
-    pList.push_back(p);
-    p_table[0] = p;
-    lastid = 0;
-
-    event *newArrival = new event;
-    newArrival->time = p.arrivalTime;
-    newArrival->type = ARRIVE;
-    newArrival->pid = p.pid;
-//    lastArrival = newArrival;
-    addToEventQ(newArrival);
+    cpuHead->cpuIsBusy = false;
+    cpuHead->pLink = NULL;
+    pHead = new procListNode;
+    pHead->arrivalTime = genexp((float)lambda);
+    pHead->startTime = 0.0;
+    pHead->reStartTime = 0.0;
+    pHead->finishTime = 0.0;
+    pHead->serviceTime = genexp(mu);
+    pHead->remainingTime = pHead->serviceTime;
+    pHead->pNext = NULL;
+    eHead = new eventQNode;
+    eHead->time = pHead->arrivalTime;
+    eHead->type = 1;
+    eHead->eNext = NULL;
+    eHead->pLink = pHead;
 }
 
 
@@ -84,7 +77,7 @@ int genID() { return ++lastid; }
 void addToEventQ(event *newEvent)
 {
     debugging(newEvent);
-    eventQ.push(newEvent);
+//    eventQ.push(newEvent);
 }
 
 
@@ -101,10 +94,10 @@ void debugging(event *newEvent)
     clog << "\n\twill happen at time: [" << newEvent->time << "]\n"
          << "\tattached to process id: [" << newEvent->pid << "]\n";
 
-    clog << "\n\tQUEUE SIZES:"
-         << "\tevent: [" << eventQ.size()
-         << "]\tready: [" << readyQ.size()
-         << "] process list: [" << pList.size() << "]\n";
+//    clog << "\n\tQUEUE SIZES:"
+//         << "\tevent: [" << eventQ.size()
+//         << "]\tready: [" << readyQ.size()
+//         << "] process list: [" << pList.size() << "]\n";
 }
 
 
@@ -130,149 +123,182 @@ float genexp(float lambda)
 
 void scheduleArrival()
 {
-    process p;
-    p.pid = genID();
-//    float timeOffset = lastArrival->time + genexp((float)lambda);
-    p.arrivalTime = p_table[p.pid-1].arrivalTime + genexp((float)lambda);
-//    p.arrivalTime = cpuHead->clock + lastArrival->time + genexp((float)lambda);
-    p.state = READY;
-    p.startTime = p.reStartTime = p.completionTime = 0.0;
-    p.burst = genexp(avgServiceTime);
-    p.remainingTime = p.burst;
-    p_table[p.pid] = p;
-    pList.push_back(p);
 
-    event *newArrival = new event;
-    newArrival->time = p.arrivalTime;
-    newArrival->type = ARRIVE;
-    newArrival->pid = p.pid;
-//    lastArrival = newArrival;
-    addToEventQ(newArrival);
+    procListNode *pIt = pHead;
+    while (pIt->pNext != NULL)
+    {
+        pIt = pIt->pNext;
+    }
+    pIt->pNext = new procListNode;
+    pIt->pNext->arrivalTime = pIt->arrivalTime + genexp((float)lambda);
+    pIt->pNext->startTime = 0.0;
+    pIt->pNext->reStartTime = 0.0;
+    pIt->pNext->finishTime = 0.0;
+    pIt->pNext->serviceTime = genexp(mu);
+    pIt->pNext->remainingTime = pIt->pNext->serviceTime;
+    pIt->pNext->pNext = NULL;
+
+    eventQNode *nuArrival = new eventQNode;
+    nuArrival->time = pIt->pNext->arrivalTime;
+    nuArrival->type = 1;
+    nuArrival->pLink = pIt->pNext;
+    nuArrival->eNext = NULL;
+
+    insertIntoEventQ(nuArrival);
 }
 
 
 void handleArrival()
 {
-    clog << "DEBUG: handleArrival()\n\ttime: " << cpuHead->clock << endl;
-    process &p = p_table[eventQ.top()->pid];
-    readyQ.push_front(p);       // add process to end of ready queue
-    eventQ.pop();               // remove first event
-}
 
+    readyQNode *nuReady = new readyQNode;
+    nuReady->pLink = eHead->pLink;
+    nuReady->rNext = NULL;
 
-void scheduleDeparture()
-{
-    clog << "DEBUG [" << cpuHead->clock << "] - scheduleDeparture()\n";
-
-    event *newDeparture = new event;
-    newDeparture->type = DEPARTURE;
-    newDeparture->pid = cpuHead->pid;
-    cpuHead->departureScheduled = true;
-
-    process &p = p_table[newDeparture->pid];
-
-    if (scheduler == _FCFS)
+    if (rHead == NULL)
+        rHead = nuReady;
+    else
     {
-        newDeparture->time = p.startTime + p.remainingTime;
-        clog << "\tnew departure event time set to: [" << newDeparture->time << "]\twith pid [" << newDeparture->pid << "]\n";
-    }
-    else if (scheduler == _SRTF)
-    {
-        // TODO
+        readyQNode *rIt = rHead;
+        while (rIt->rNext != 0)
+        {
+            rIt = rIt->rNext;
+        }
+        rIt->rNext = nuReady;
     }
 
-    addToEventQ(newDeparture);
-}
-
-
-void handleDeparture()
-{
-    clog << "DEBUG [" << cpuHead->clock << "]: handleDeparture()\n";
-
-    cpuHead->clock = eventQ.top()->time;
-
-    process &p = p_table[eventQ.top()->pid];
-    p.completionTime = cpuHead->clock;
-    p.remainingTime = 0.0;
-
-    cpuHead->pLink = nullptr;
-    cpuHead->cpuBusy = false;
-    cpuHead->pid = NULL;
-    cpuHead->departureScheduled = false;
-
-    eventQ.pop();
-    clog << "\t[" << cpuHead->clock << "]\tdeparture event was popped from queue\n";
+    popEventQHead();
 }
 
 
 void scheduleAllocation()
 {
-    clog << "DEBUG [" << cpuHead->clock << "] - scheduleAllocation()\n";
 
-    event *newAllocation = new event;
-    process nextProcess;
+    eventQNode *nuAllocation = new eventQNode;
 
-//    process currentProcess = p_table[eventQ.top()->pid];
-//    process nextProcess = p_table[eventQ.top()->pid + 1];
-    switch (scheduler)
+    procListNode *nextProc;
+    if (schedulerType == _FCFS)
+        nextProc = rHead->pLink;
+    else if (schedulerType == _SRTF)
     {
-        case _FCFS:
-            if (readyQ.empty())
-                nextProcess = p_table[(eventQ.top()->pid+1)];
-            else
-                nextProcess = readyQ[1];
-            break;
-        case _SRTF:
-            break;
-        case _RR:
-            break;
-        default:
-            cerr << "invalid scheduler\n";
+        if (cpuHead->clock > rHead->pLink->arrivalTime)
+        {
+//            nextProc = getSRTProcess();
+        }
+        else
+        {
+            nextProc = rHead->pLink;
+        }
+    }
+    else if (schedulerType == _RR)
+    {
+//        nextProc = getHRRProcess();
     }
 
-    if (cpuHead->clock < nextProcess.arrivalTime)
-        newAllocation->time = nextProcess.arrivalTime;
+    if (cpuHead->clock < nextProc->arrivalTime)
+    {
+        nuAllocation->time = nextProc->arrivalTime;
+    }
     else
-        newAllocation->time = cpuHead->clock;
+    {
+        nuAllocation->time = cpuHead->clock;
+    }
 
-    newAllocation->type = ALLOCATION;
-    newAllocation->pid = nextProcess.pid;
+    nuAllocation->type = 3;
+    nuAllocation->eNext = NULL;
+    nuAllocation->pLink = nextProc;
 
-    addToEventQ(newAllocation);
+    insertIntoEventQ(nuAllocation);
 }
-
 
 void handleAllocation()
 {
-    clog << "DEBUG [" << cpuHead->clock << "] - handleAllocation()\n";
-    clog << "\tcpuPid before: [" << cpuHead->pid << "]\n";
 
-    process &p = p_table[eventQ.top()->pid];
+    cpuHead->pLink = eHead->pLink;
 
-    // FIXME - this is resetting  back to old ids, biggest problem right now
-    cpuHead->pid = p.pid;
-    clog << "\tcpuPid after: [" << cpuHead->pid << "]\n";
-
-    if (scheduler == _SRTF || scheduler == _RR)
+    if (schedulerType == 2 || schedulerType == 3)
     {
-        //TODO
+
+        readyQNode *rIt = rHead->rNext;
+        readyQNode *rItPrev = rHead;
+        if (rItPrev->pLink->arrivalTime != eHead->pLink->arrivalTime)
+        {
+            while (rIt != 0)
+            {
+                if (rIt->pLink->arrivalTime == eHead->pLink->arrivalTime)
+                {
+                    rItPrev->rNext = rIt->rNext;
+                    rIt->rNext = rHead;
+                    rHead = rIt;
+                    break;
+                }
+                rIt = rIt->rNext;
+                rItPrev = rItPrev->rNext;
+            }
+        }
     }
 
-    readyQ.pop_front(); // remove front ready process
-    eventQ.pop();   // remove top event
+    popReadyQHead();
+    popEventQHead();
 
-    cpuHead->cpuBusy = true;
+    cpuHead->cpuIsBusy = true;
 
-    // this represents the cpu starting to work on the process at its arrival time
-    if (cpuHead->clock < p.arrivalTime)
-        cpuHead->clock = p.arrivalTime;
-    // the start time of processing is now set
-    if (p.startTime == 0)
-        p.startTime = cpuHead->clock;
+    if (cpuHead->clock < cpuHead->pLink->arrivalTime)
+    {
+        cpuHead->clock = cpuHead->pLink->arrivalTime;
+    }
+
+    if (cpuHead->pLink->startTime == 0)
+    {
+        cpuHead->pLink->startTime = cpuHead->clock;
+    }
     else
-        p.reStartTime = cpuHead->clock;
+    {
+        cpuHead->pLink->reStartTime = cpuHead->clock;
+    }
+}
 
-    cout << "\t\tcpu time: " << cpuHead->clock << endl;
+void scheduleDeparture()
+{
+
+    eventQNode *nuDeparture = new eventQNode;
+    nuDeparture->type = 2;
+    nuDeparture->eNext = 0;
+    nuDeparture->pLink = cpuHead->pLink;
+
+    if (schedulerType == 1 || schedulerType == 3)
+    {
+        nuDeparture->time = cpuHead->pLink->startTime + cpuHead->pLink->remainingTime;
+    }
+    else if (schedulerType == 2)
+    {
+        if (cpuHead->pLink->reStartTime == 0)
+        {
+            nuDeparture->time = cpuHead->pLink->startTime + cpuHead->pLink->remainingTime;
+        }
+        else
+        {
+            nuDeparture->time = cpuHead->pLink->reStartTime + cpuHead->pLink->remainingTime;
+        }
+    }
+
+    insertIntoEventQ(nuDeparture);
+}
+
+void handleDeparture()
+{
+
+    cpuHead->clock = eHead->time;
+
+    cpuHead->pLink->finishTime = cpuHead->clock;
+    pHead->finishTime = cpuHead->pLink->finishTime;
+
+    cpuHead->pLink->remainingTime = 0.0;
+    cpuHead->pLink = NULL;
+
+    cpuHead->cpuIsBusy = false;
+
+    popEventQHead();
 }
 
 void schedulePreemption()
@@ -284,12 +310,12 @@ void schedulePreemption()
 ////////////////////////////////////////////////////////////
 int run_sim()
 {
-    switch (scheduler)
+    switch (schedulerType)
     {
         case _FCFS: cout << "Scheduling as FCFS\n\n";  FCFS(); break;
         case _SRTF: cout << "Scheduling as SRTF\n\n";  SRTF(); break;
         case _RR:   cout << "Scheduling as RR\n\n";    RR();   break;
-        default:    cerr << "invalid scheduler\n";     return 1;
+        default:    cerr << "invalid schedulerType\n";     return 1;
     }
     return 0;
 }
@@ -303,44 +329,31 @@ void FCFS()
 
     while (departureCount < MAX_PROCESSES)
     {
-        clog << "\n\nDEBUG [" << cpuHead->clock << "] ----------------- loop start\n\n";
-        _clock = eventQ.top()->time;
-        // if CPU is idle, then an arrival event can be scheduled
-        clog << "DEBUG: CPU\n"
-            << "\ttime: " << cpuHead->clock
-            << "\n\tbusy: " << cpuHead->cpuBusy
-            << "\n\tpid: " << cpuHead->pid << endl;
-
-        clog << "current time: " << _clock;
-        if (!cpuHead->cpuBusy)
+        if (cpuHead->cpuIsBusy == false)
         {
             scheduleArrival();
-            if (readyQ.empty())
-                scheduleAllocation();   // schedule process to be given to CPU
+            if (rHead != NULL)
+            {
+                scheduleAllocation();
+            }
         }
-        else // process in the CPU can be scheduled for departure
+        else
+            scheduleDeparture();
+
+        if (eHead->type == 1)
         {
-            if (!cpuHead->departureScheduled)
-                scheduleDeparture();
+            handleArrival();
+            p_count++;
         }
-
-
-        switch (eventQ.top()->type)
+        else if (eHead->type == 2)
         {
-            case ARRIVE:
-                handleArrival();
-                p_count++;
-                break;
-            case DEPARTURE:
-                handleDeparture();
-                departureCount++;
-                break;
-            case ALLOCATION:
-                handleAllocation();
-                allocationCount++;
-                break;
-            default:
-                cerr << "invalid type";
+            handleDeparture();
+            departureCount++;
+        }
+        else if (eHead->type == 3)
+        {
+            handleAllocation();
+            allocationCount++;
         }
     }
     cout << "Arrival Count: " << p_count << endl;
@@ -348,6 +361,55 @@ void FCFS()
     cout << "Allocation Count: " << allocationCount << endl;
 }
 
+// Helper Function
+void insertIntoEventQ(eventQNode *nuEvent)
+{
+
+    if (eHead == 0)
+        eHead = nuEvent;
+    else if (eHead->time > nuEvent->time)
+    {
+        nuEvent->eNext = eHead;
+        eHead = nuEvent;
+    }
+    else
+    {
+        eventQNode *eIt = eHead;
+        while (eIt != 0)
+        {
+            if ((eIt->time < nuEvent->time) && (eIt->eNext == 0))
+            {
+                eIt->eNext = nuEvent;
+                break;
+            }
+            else if ((eIt->time < nuEvent->time) && (eIt->eNext->time > nuEvent->time))
+            {
+                nuEvent->eNext = eIt->eNext;
+                eIt->eNext = nuEvent;
+                break;
+            }
+            else
+            {
+                eIt = eIt->eNext;
+            }
+        }
+    }
+}
+// Helper Function
+void popEventQHead()
+{
+    eventQNode *tempPtr = eHead;
+    eHead = eHead->eNext;
+    delete tempPtr;
+}
+
+// Helper Function
+void popReadyQHead()
+{
+    readyQNode *tempPtr = rHead;
+    rHead = rHead->rNext;
+    delete tempPtr;
+}
 
 void SRTF()
 {
@@ -363,6 +425,7 @@ void RR()
 
 ////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[] )
+clog << "hello";
 {
     if (argc < 3)
     {
