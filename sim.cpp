@@ -73,6 +73,18 @@ void init()
 ////////////////////////////////////////////////////////////////
 void generate_report()
 {
+    //statistics needed:
+    //total throughput
+    //total
+    /*
+    for (int i; i <= p_table[].size(); i++)
+    {
+        process temp = p_table[i];
+    }
+
+
+     */
+
     // output statistics
     clog << "outputting stats\n";
 }
