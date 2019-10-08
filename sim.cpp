@@ -65,7 +65,7 @@ void init()
     newArrival->time = p.arrivalTime;
     newArrival->type = ARRIVE;
     newArrival->pid = p.pid;
-    lastArrival = newArrival;
+//    lastArrival = newArrival;
     addToEventQ(newArrival);
 }
 
@@ -146,7 +146,7 @@ void scheduleArrival()
     newArrival->time = p.arrivalTime;
     newArrival->type = ARRIVE;
     newArrival->pid = p.pid;
-    lastArrival = newArrival;
+//    lastArrival = newArrival;
     addToEventQ(newArrival);
 }
 
@@ -306,6 +306,12 @@ void FCFS()
         clog << "\n\nDEBUG [" << cpuHead->clock << "] ----------------- loop start\n\n";
         _clock = eventQ.top()->time;
         // if CPU is idle, then an arrival event can be scheduled
+        clog << "DEBUG: CPU\n"
+            << "\ttime: " << cpuHead->clock
+            << "\n\tbusy: " << cpuHead->cpuBusy
+            << "\n\tpid: " << cpuHead->pid << endl;
+
+        clog << "current time: " << _clock;
         if (!cpuHead->cpuBusy)
         {
             scheduleArrival();
