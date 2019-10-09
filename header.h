@@ -34,7 +34,7 @@ struct procListNode
     float startTime;
     float reStartTime;
     float finishTime;
-    float serviceTime;
+    float burst;
     float remainingTime;
     struct procListNode *pNext;
 };
@@ -84,18 +84,16 @@ Scheduler schedulerType;
 
 // Global Variables
 float avgArrivalTime;
-float avgServiceTime;
 int lambda;
 int lastid;
-float avgTs;
+float avgServiceTime;
 float quantum;
-int stopCond = 10000;
 float mu = 0.0;
 float quantumClock;
-eventQNode *eHead;
-procListNode *pHead;
-readyQNode *rHead;
-cpuNode *cpuHead;
+eventQNode *eq_head;
+procListNode *pl_head;
+readyQNode *rq_head;
+cpuNode *cpu_head;
 int countSomething = 0;
 
 //int lambda,
@@ -124,8 +122,8 @@ float genexp(float);
 
 void scheduleArrival();
 void scheduleDeparture();
-void scheduleAllocation();
-void handleAllocation();
+void scheduleDispatch();
+void handleDispatch();
 void schedulePreemption();
 void handleArrival();
 void debugging(event *newEvent);

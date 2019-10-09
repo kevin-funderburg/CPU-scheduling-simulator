@@ -20,10 +20,9 @@ using namespace std;
 /////////////////////////////////////////////////
 void parseArgs(int argc, char *argv[])
 {
-    schedulerType = static_cast<Scheduler>(stoi(argv[1]));  // set schedulerType algorithm
-    lambda = (stoi(argv[2]));                 // 1 / argument is the arrival process time
-    avgArrivalTime = 1 / (float)lambda;
-    avgTs = stof(argv[3]);
+    schedulerType = static_cast<Scheduler>(stoi(argv[1]));  // set schedulerType
+    lambda = 1.0 / stof(argv[2]);
+    avgServiceTime = stof(argv[3]);
     if (argc == 5)
         float quantum = stof(argv[4]);
 }
@@ -41,25 +40,28 @@ static void show_usage()
 
 void init()
 {
-    mu = (float)1.0 / avgTs;
+//    mu = (float)1.0 / avgServiceTime;
     quantumClock = 0.0;
-    cpuHead = new cpuNode;
-    cpuHead->clock = 0.0;
-    cpuHead->cpuBusy = false;
-    cpuHead->pLink = NULL;
-    pHead = new procListNode;
-    pHead->arrivalTime = genexp((float)lambda);
-    pHead->startTime = 0.0;
-    pHead->reStartTime = 0.0;
-    pHead->finishTime = 0.0;
-    pHead->serviceTime = genexp(mu);
-    pHead->remainingTime = pHead->serviceTime;
-    pHead->pNext = NULL;
-    eHead = new eventQNode;
-    eHead->time = pHead->arrivalTime;
-    eHead->type = 1;
-    eHead->eNext = NULL;
-    eHead->pLink = pHead;
+
+    cpu_head = new cpuNode;
+    cpu_head->clock = 0.0;
+    cpu_head->cpuBusy = false;
+    cpu_head->pLink = NULL;
+
+    pl_head = new procListNode;
+    pl_head->arrivalTime = genexp((float)lambda);
+    pl_head->startTime = 0.0;
+    pl_head->reStartTime = 0.0;
+    pl_head->finishTime = 0.0;
+    pl_head->burst = genexp(mu);
+    pl_head->remainingTime = pl_head->burst;
+    pl_head->pNext = NULL;
+
+    eq_head = new eventQNode;
+    eq_head->time = pl_head->arrivalTime;
+    eq_head->type = ARRIVE;
+    eq_head->eNext = NULL;
+    eq_head->pLink = pl_head;
 }
 
 
@@ -83,12 +85,11 @@ void addToEventQ(event *newEvent)
 
 void debugging(event *newEvent)
 {
-    clog  << "DEBUG [" << cpuHead->clock << "] - adding event: ";
+    clog << "DEBUG [" << cpu_head->clock << "] - adding event: ";
     switch (newEvent->type) {
         case ARRIVE: clog << "ARRIVE"; break;
         case DEPARTURE: clog << "DEPARTURE"; break;
-        case ALLOCATION: clog << "ALLOCATION"; break;
-        case COMPLETION: clog << "COMPLETION"; break;
+        case DISPATCH: clog << "DISPATCH"; break;
         default: cerr << "invalid type";
     }
     clog << "\n\twill happen at time: [" << newEvent->time << "]\n"
@@ -124,70 +125,67 @@ float genexp(float lambda)
 void scheduleArrival()
 {
 
-    procListNode *pIt = pHead;
-    while (pIt->pNext != NULL)
-    {
-        pIt = pIt->pNext;
-    }
-    pIt->pNext = new procListNode;
-    pIt->pNext->arrivalTime = pIt->arrivalTime + genexp((float)lambda);
-    pIt->pNext->startTime = 0.0;
-    pIt->pNext->reStartTime = 0.0;
-    pIt->pNext->finishTime = 0.0;
-    pIt->pNext->serviceTime = genexp(mu);
-    pIt->pNext->remainingTime = pIt->pNext->serviceTime;
-    pIt->pNext->pNext = NULL;
+    procListNode *pl_cursor = pl_head;
+    while (pl_cursor->pNext != NULL)
+        pl_cursor = pl_cursor->pNext;
 
-    eventQNode *nuArrival = new eventQNode;
-    nuArrival->time = pIt->pNext->arrivalTime;
-    nuArrival->type = 1;
-    nuArrival->pLink = pIt->pNext;
-    nuArrival->eNext = NULL;
+    pl_cursor->pNext = new procListNode;
+    pl_cursor->pNext->arrivalTime = pl_cursor->arrivalTime + genexp((float)lambda);
+    pl_cursor->pNext->startTime = 0.0;
+    pl_cursor->pNext->reStartTime = 0.0;
+    pl_cursor->pNext->finishTime = 0.0;
+    pl_cursor->pNext->burst = genexp(mu);
+    pl_cursor->pNext->remainingTime = pl_cursor->pNext->burst;
+    pl_cursor->pNext->pNext = NULL;
 
-    insertIntoEventQ(nuArrival);
+    eventQNode *arrival = new eventQNode;
+    arrival->time = pl_cursor->pNext->arrivalTime;
+    arrival->type = ARRIVE;
+    arrival->pLink = pl_cursor->pNext;
+    arrival->eNext = NULL;
+
+    insertIntoEventQ(arrival);
 }
 
-
+//Push process into ready queue and remove event from event queue
 void handleArrival()
 {
+    readyQNode *ready = new readyQNode;
+    ready->pLink = eq_head->pLink;
+    ready->rNext = NULL;
 
-    readyQNode *nuReady = new readyQNode;
-    nuReady->pLink = eHead->pLink;
-    nuReady->rNext = NULL;
-
-    if (rHead == NULL)
-        rHead = nuReady;
+    if (rq_head == NULL)  //empty queue
+        rq_head = ready;
     else
     {
-        readyQNode *rIt = rHead;
-        while (rIt->rNext != 0)
-        {
-            rIt = rIt->rNext;
-        }
-        rIt->rNext = nuReady;
+        readyQNode *rq_cursor = rq_head;
+        while (rq_cursor->rNext != NULL)
+            rq_cursor = rq_cursor->rNext;
+
+        rq_cursor->rNext = ready;
     }
 
     popEventQHead();
 }
 
 
-void scheduleAllocation()
+void scheduleDispatch()
 {
 
     eventQNode *nuAllocation = new eventQNode;
 
     procListNode *nextProc;
     if (schedulerType == _FCFS)
-        nextProc = rHead->pLink;
+        nextProc = rq_head->pLink;
     else if (schedulerType == _SRTF)
     {
-        if (cpuHead->clock > rHead->pLink->arrivalTime)
+        if (cpu_head->clock > rq_head->pLink->arrivalTime)
         {
 //            nextProc = getSRTProcess();
         }
         else
         {
-            nextProc = rHead->pLink;
+            nextProc = rq_head->pLink;
         }
     }
     else if (schedulerType == _RR)
@@ -195,45 +193,41 @@ void scheduleAllocation()
 //        nextProc = getHRRProcess();
     }
 
-    if (cpuHead->clock < nextProc->arrivalTime)
-    {
+    if (cpu_head->clock < nextProc->arrivalTime)
         nuAllocation->time = nextProc->arrivalTime;
-    }
-    else
-    {
-        nuAllocation->time = cpuHead->clock;
-    }
 
-    nuAllocation->type = 3;
+    else
+        nuAllocation->time = cpu_head->clock;
+
+    nuAllocation->type = DISPATCH;
     nuAllocation->eNext = NULL;
     nuAllocation->pLink = nextProc;
 
     insertIntoEventQ(nuAllocation);
 }
 
-void handleAllocation()
+void handleDispatch()
 {
+    cpu_head->pLink = eq_head->pLink;  //assign process to CPU
 
-    cpuHead->pLink = eHead->pLink;
-
-    if (schedulerType == 2 || schedulerType == 3)
+    if (schedulerType == _SRTF || schedulerType == _RR)
     {
 
-        readyQNode *rIt = rHead->rNext;
-        readyQNode *rItPrev = rHead;
-        if (rItPrev->pLink->arrivalTime != eHead->pLink->arrivalTime)
+        readyQNode *rq_cursor = rq_head->rNext;
+        readyQNode *rq_precursor = rq_head;
+        if (rq_precursor->pLink->arrivalTime != eq_head->pLink->arrivalTime)
         {
-            while (rIt != 0)
+            while (rq_cursor != NULL)
             {
-                if (rIt->pLink->arrivalTime == eHead->pLink->arrivalTime)
+                if (rq_cursor->pLink->arrivalTime == eq_head->pLink->arrivalTime)
                 {
-                    rItPrev->rNext = rIt->rNext;
-                    rIt->rNext = rHead;
-                    rHead = rIt;
+                    rq_precursor->rNext = rq_cursor->rNext;
+                    rq_cursor->rNext = rq_head;
+                    rq_head = rq_cursor;
                     break;
                 }
-                rIt = rIt->rNext;
-                rItPrev = rItPrev->rNext;
+                rq_cursor = rq_cursor->rNext;
+                rq_precursor = rq_precursor->rNext;
             }
         }
     }
@@ -241,45 +235,33 @@ void handleAllocation()
     popReadyQHead();
     popEventQHead();
 
-    cpuHead->cpuBusy = true;
+    cpu_head->cpuBusy = true;    //CPU now busy executing process
 
-    if (cpuHead->clock < cpuHead->pLink->arrivalTime)
-    {
-        cpuHead->clock = cpuHead->pLink->arrivalTime;
-    }
+    if (cpu_head->clock < cpu_head->pLink->arrivalTime)
+        cpu_head->clock = cpu_head->pLink->arrivalTime;
 
-    if (cpuHead->pLink->startTime == 0)
-    {
-        cpuHead->pLink->startTime = cpuHead->clock;
-    }
+    if (cpu_head->pLink->startTime == 0)
+        cpu_head->pLink->startTime = cpu_head->clock;
     else
-    {
-        cpuHead->pLink->reStartTime = cpuHead->clock;
-    }
+        cpu_head->pLink->reStartTime = cpu_head->clock;
 }
 
 void scheduleDeparture()
 {
-
     eventQNode *nuDeparture = new eventQNode;
-    nuDeparture->type = 2;
-    nuDeparture->eNext = 0;
-    nuDeparture->pLink = cpuHead->pLink;
+    nuDeparture->type = DEPARTURE;
+    nuDeparture->eNext = NULL;
+    nuDeparture->pLink = cpu_head->pLink;
 
-    if (schedulerType == 1 || schedulerType == 3)
+    if (schedulerType == _FCFS || schedulerType == _RR)
+        nuDeparture->time = cpu_head->pLink->startTime + cpu_head->pLink->remainingTime;  //FCFS will process to completion
+
+    else if (schedulerType == _SRTF)
     {
-        nuDeparture->time = cpuHead->pLink->startTime + cpuHead->pLink->remainingTime;
-    }
-    else if (schedulerType == 2)
-    {
-        if (cpuHead->pLink->reStartTime == 0)
-        {
-            nuDeparture->time = cpuHead->pLink->startTime + cpuHead->pLink->remainingTime;
-        }
+        if (cpu_head->pLink->reStartTime == 0)
+            nuDeparture->time = cpu_head->pLink->startTime + cpu_head->pLink->remainingTime;
         else
-        {
-            nuDeparture->time = cpuHead->pLink->reStartTime + cpuHead->pLink->remainingTime;
-        }
+            nuDeparture->time = cpu_head->pLink->reStartTime + cpu_head->pLink->remainingTime;
     }
 
     insertIntoEventQ(nuDeparture);
@@ -287,18 +269,17 @@ void scheduleDeparture()
 
 void handleDeparture()
 {
+    cpu_head->clock = eq_head->time;   //set clock to head of event queue
 
-    cpuHead->clock = eHead->time;
+    cpu_head->pLink->finishTime = cpu_head->clock;    //log finishTime
+    pl_head->finishTime = cpu_head->pLink->finishTime;
 
-    cpuHead->pLink->finishTime = cpuHead->clock;
-    pHead->finishTime = cpuHead->pLink->finishTime;
+    cpu_head->pLink->remainingTime = 0.0;    //clear remainingTime
+    cpu_head->pLink = NULL;
 
-    cpuHead->pLink->remainingTime = 0.0;
-    cpuHead->pLink = NULL;
+    cpu_head->cpuBusy = false;   //CPU ready for next process
 
-    cpuHead->cpuBusy = false;
-
-    popEventQHead();
+    popEventQHead();    //remove departure event
 }
 
 void schedulePreemption()
@@ -335,31 +316,31 @@ void FCFS()
 
     while (departureCount < MAX_PROCESSES)
     {
-        if (!cpuHead->cpuBusy)
+        if (!cpu_head->cpuBusy)
         {
             scheduleArrival();
-            if (rHead != NULL)
-            {
-                scheduleAllocation();
-            }
+            if (rq_head != NULL)
+                scheduleDispatch();
         }
         else
             scheduleDeparture();
 
-        if (eHead->type == 1)
+        switch (eq_head->type)
         {
-            handleArrival();
-            p_count++;
-        }
-        else if (eHead->type == 2)
-        {
-            handleDeparture();
-            departureCount++;
-        }
-        else if (eHead->type == 3)
-        {
-            handleAllocation();
-            allocationCount++;
+            case ARRIVE:
+                handleArrival();
+                p_count++;
+                break;
+            case DISPATCH:
+                handleDispatch();
+                allocationCount++;
+                break;
+            case DEPARTURE:
+                handleDeparture();
+                departureCount++;
+                break;
+            default:
+                cerr << "invalid event type\n";
         }
     }
     cout << "Arrival Count: " << p_count << endl;
@@ -367,53 +348,51 @@ void FCFS()
     cout << "Allocation Count: " << allocationCount << endl;
 }
 
-// Helper Function
-void insertIntoEventQ(eventQNode *nuEvent)
+// The event queue is treated as a priority queue by sorting
+// the events based on time.
+void insertIntoEventQ(eventQNode *newEvent)
 {
-
-    if (eHead == 0)
-        eHead = nuEvent;
-    else if (eHead->time > nuEvent->time)
+    if (eq_head == NULL)  //empty list
+        eq_head = newEvent;
+    else if (eq_head->time > newEvent->time)   //add to front
     {
-        nuEvent->eNext = eHead;
-        eHead = nuEvent;
+        newEvent->eNext = eq_head;
+        eq_head = newEvent;
     }
     else
     {
-        eventQNode *eIt = eHead;
-        while (eIt != 0)
+        eventQNode *eq_cursor = eq_head;
+        while (eq_cursor != NULL)
         {
-            if ((eIt->time < nuEvent->time) && (eIt->eNext == 0))
+            if ((eq_cursor->time < newEvent->time) && (eq_cursor->eNext == NULL))  //add to tail
             {
-                eIt->eNext = nuEvent;
+                eq_cursor->eNext = newEvent;
                 break;
             }
-            else if ((eIt->time < nuEvent->time) && (eIt->eNext->time > nuEvent->time))
+            else if ((eq_cursor->time < newEvent->time) && (eq_cursor->eNext->time > newEvent->time))   //add inside
             {
-                nuEvent->eNext = eIt->eNext;
-                eIt->eNext = nuEvent;
+                newEvent->eNext = eq_cursor->eNext;
+                eq_cursor->eNext = newEvent;
                 break;
             }
             else
-            {
-                eIt = eIt->eNext;
-            }
+                eq_cursor = eq_cursor->eNext;
         }
     }
 }
 // Helper Function
 void popEventQHead()
 {
-    eventQNode *tempPtr = eHead;
-    eHead = eHead->eNext;
+    eventQNode *tempPtr = eq_head;
+    eq_head = eq_head->eNext;
     delete tempPtr;
 }
 
 // Helper Function
 void popReadyQHead()
 {
-    readyQNode *tempPtr = rHead;
-    rHead = rHead->rNext;
+    readyQNode *tempPtr = rq_head;
+    rq_head = rq_head->rNext;
     delete tempPtr;
 }
 
@@ -428,6 +407,24 @@ void RR()
     //TODO
 }
 
+float getTurnaroundTime()
+{
+    float totalTurnaround = 0.0,
+            avgTurnaround = 0.0;
+
+    if (pl_head == NULL)  //empty queue
+        cerr << "empty queue";
+    else {
+        procListNode *pl_cursor = pl_head;
+        while (pl_cursor->pNext != NULL)
+        {
+            totalTurnaround += (pl_cursor->finishTime - pl_cursor->arrivalTime);
+            pl_cursor = pl_cursor->pNext;
+        }
+    avgTurnaround = MAX_PROCESSES / totalTurnaround;
+    return avgTurnaround;
+    }
+}
 
 ////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[] )
