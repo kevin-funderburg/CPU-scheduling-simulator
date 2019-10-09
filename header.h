@@ -42,9 +42,8 @@ struct procListNode
 struct cpuNode
 {
     float clock;
-    bool cpuIsBusy;
+    bool cpuBusy;
     int pid;
-    bool departureScheduled;
     struct procListNode *pLink;
 };
 

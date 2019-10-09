@@ -23,7 +23,7 @@ void parseArgs(int argc, char *argv[])
     schedulerType = static_cast<Scheduler>(stoi(argv[1]));  // set schedulerType algorithm
     lambda = (stoi(argv[2]));                 // 1 / argument is the arrival process time
     avgArrivalTime = 1 / (float)lambda;
-    avgServiceTime = stof(argv[3]);
+    avgTs = stof(argv[3]);
     if (argc == 5)
         float quantum = stof(argv[4]);
 }
@@ -45,7 +45,7 @@ void init()
     quantumClock = 0.0;
     cpuHead = new cpuNode;
     cpuHead->clock = 0.0;
-    cpuHead->cpuIsBusy = false;
+    cpuHead->cpuBusy = false;
     cpuHead->pLink = NULL;
     pHead = new procListNode;
     pHead->arrivalTime = genexp((float)lambda);
@@ -241,7 +241,7 @@ void handleAllocation()
     popReadyQHead();
     popEventQHead();
 
-    cpuHead->cpuIsBusy = true;
+    cpuHead->cpuBusy = true;
 
     if (cpuHead->clock < cpuHead->pLink->arrivalTime)
     {
@@ -296,7 +296,7 @@ void handleDeparture()
     cpuHead->pLink->remainingTime = 0.0;
     cpuHead->pLink = NULL;
 
-    cpuHead->cpuIsBusy = false;
+    cpuHead->cpuBusy = false;
 
     popEventQHead();
 }
@@ -312,10 +312,16 @@ int run_sim()
 {
     switch (schedulerType)
     {
-        case _FCFS: cout << "Scheduling as FCFS\n\n";  FCFS(); break;
-        case _SRTF: cout << "Scheduling as SRTF\n\n";  SRTF(); break;
-        case _RR:   cout << "Scheduling as RR\n\n";    RR();   break;
-        default:    cerr << "invalid schedulerType\n";     return 1;
+        case _FCFS: cout << "Scheduling as FCFS\n\n";
+            FCFS();
+            break;
+        case _SRTF: cout << "Scheduling as SRTF\n\n";
+            SRTF();
+            break;
+        case _RR: cout << "Scheduling as RR\n\n";
+            RR();
+            break;
+        default: cerr << "invalid schedulerType\n"; return 1;
     }
     return 0;
 }
@@ -329,7 +335,7 @@ void FCFS()
 
     while (departureCount < MAX_PROCESSES)
     {
-        if (cpuHead->cpuIsBusy == false)
+        if (!cpuHead->cpuBusy)
         {
             scheduleArrival();
             if (rHead != NULL)
@@ -425,8 +431,9 @@ void RR()
 
 ////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[] )
-clog << "hello";
 {
+    clog << "hello";
+
     if (argc < 3)
     {
         show_usage();
