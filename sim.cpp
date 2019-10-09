@@ -75,14 +75,16 @@ void init()
 ////////////////////////////////////////////////////////////////
 void generate_report()
 {
-    clog << "outputting stats\n";
-    ofstream data("data.txt",  ios::out | ios::app);
-    data << "Average Turnaround Time\n";// << lambda << "\t\t" << getAvgTurnaround();
-//    if (data.is_open())
-//    {
-//    }
-//    else cout << "Unable to open file";
-//        data.close();
+//    clog << "outputting stats\n";
+    cout << pwd;
+    ofstream data("../../data.txt",  ios::out | ios::app);
+    if (data.is_open())
+    {
+        cout << lambda << "\t\t" << getAvgTurnaround();
+        data << lambda << "\t\t" << getAvgTurnaround();
+        data.close();
+    }
+    else cout << "Unable to open file";
 }
 
 
@@ -435,9 +437,9 @@ float getAvgTurnaround()
         {
             if (pl_cursor->finishTime != 0)
             {
-                float tmp = pl_cursor->finishTime - pl_cursor->arrivalTime;
-                cout << pl_cursor->pid << ": " << "pl_cursor->finishTime - pl_cursor->arrivalTime: "
-                    << pl_cursor->finishTime << " - " << pl_cursor->arrivalTime << " = " << tmp << endl;
+//                float tmp = pl_cursor->finishTime - pl_cursor->arrivalTime;
+//                cout << pl_cursor->pid << ": " << "pl_cursor->finishTime - pl_cursor->arrivalTime: "
+//                    << pl_cursor->finishTime << " - " << pl_cursor->arrivalTime << " = " << tmp << endl;
                 totalTurnaround += (pl_cursor->finishTime - pl_cursor->arrivalTime);
                 //            cout << "totalTurnaround: " << totalTurnaround << endl;
 
