@@ -109,7 +109,6 @@ float genexp(float lambda)
 
 void scheduleArrival()
 {
-
     procListNode *pl_cursor = pl_head;
     while (pl_cursor->pl_next != NULL)
         pl_cursor = pl_cursor->pl_next;
@@ -157,7 +156,6 @@ void handleArrival()
 
 void scheduleDispatch()
 {
-
     eventQNode *dispatch = new eventQNode;
 
     procListNode *nextProc;
@@ -430,12 +428,7 @@ float getAvgTurnaround()
 //    cout << "totalTurnaround: " << totalTurnaround << endl;
     return totalTurnaround / MAX_PROCESSES;
 }
-
-int outPut()
-{
-
-}
-////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
 int main(int argc, char *argv[] )
 {
     clog << "hello\n";

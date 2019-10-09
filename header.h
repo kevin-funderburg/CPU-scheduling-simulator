@@ -13,23 +13,9 @@
 using namespace std;
 #define MAX_PROCESSES 10000
 
-////////////////////////////////////////////////////////////////
 enum State {READY = 0, RUNNING = 1, TERMINATED = 3};
 enum Scheduler {_FCFS = 1, _SRTF = 2, _RR = 3};
 enum EventType {ARRIVE = 1, DISPATCH = 2, DEPARTURE = 3};
-
-////////////////////////////////////////////////////////////////
-//struct process
-////{
-////    int pid;                // process ID
-////    State state;            // process state
-////    float arrivalTime,      // arrival time
-////          startTime,        // time started in CPU
-////          reStartTime,      // time back in CPU
-////          burst,            // service time
-////          remainingTime,    // time remaining until completion
-////          completionTime;   // process completion
-////};
 
 struct procListNode
 {
@@ -65,12 +51,6 @@ struct eventQNode
     struct procListNode *p_link;
 };
 
-//struct procListNode
-//{
-//    process p;
-//    struct procListNode *pl_next;
-//};
-
 
 ////////////////////////////////////////////////////////////////
 // Global variables
@@ -99,22 +79,13 @@ procListNode *pl_head;
 readyQNode *rq_head;
 cpuNode *cpu_head;
 int countSomething = 0;
-
-//int lambda,
-//    p_completed,        // end condition
-//    lastid;             // id of last process
-//float _clock,           // simulation clock
-//        avgArrivalTime,
-//        avgServiceTime;
-//bool CPUbusy;
-////////////////////////////////////////////////////////////////
-
+///////////////////////////////////////////////////////////////
 
 /* Scheduling Algorithms */
 void FCFS();
 void SRTF();
 void RR();
-////////////////////////////////////////////////////////////////
+
 // function definitions
 void parseArgs(char *[]);
 void init();
@@ -124,7 +95,6 @@ float urand();
 float genexp(float);
 
 float getAvgTurnaround();
-int outPut();
 
 void scheduleArrival();
 void scheduleDeparture();
@@ -132,8 +102,7 @@ void scheduleDispatch();
 void handleDispatch();
 void schedulePreemption();
 void handleArrival();
-//void debugging(event *newEvent);
-//void addToEventQ(event *newEvent);
+
 // Initializations
 void insertIntoEventQ(eventQNode *);
 void popEventQHead();
