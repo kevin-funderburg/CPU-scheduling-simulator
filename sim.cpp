@@ -10,18 +10,20 @@
 // Use 105 ms for the preemptive _SRTF
 /////////////////////////////////////////////////
 #include <iostream>
+#include <fstream>
 #include <cstdlib>
 #include <cmath>
 #include <list>
 #include <queue>
-#include "event.h"
+//#include "event.h"
 #include "header.h"
 using namespace std;
 /////////////////////////////////////////////////
 void parseArgs(int argc, char *argv[])
 {
-    schedulerType = static_cast<Scheduler>(stoi(argv[1]));  // set schedulerType
-    lambda = 1.0 / stof(argv[2]);
+    scheduler = static_cast<Scheduler>(stoi(argv[1]));  // set scheduler
+    lambda = stoi(argv[2]);
+//    lambda = (float)1.0 / stof(argv[2]);
     avgServiceTime = stof(argv[3]);
     if (argc == 5)
         float quantum = stof(argv[4]);
@@ -42,64 +44,75 @@ void init()
 {
 //    mu = (float)1.0 / avgServiceTime;
     quantumClock = 0.0;
+    lastid = 0;
+
+    avgArrivalTime = 1.0/(float)lambda;
 
     cpu_head = new cpuNode;
     cpu_head->clock = 0.0;
-    cpu_head->cpuBusy = false;
-    cpu_head->pLink = NULL;
+    cpu_head->busy = false;
+    cpu_head->p_link = NULL;
 
     pl_head = new procListNode;
-    pl_head->arrivalTime = genexp((float)lambda);
+    pl_head->pid = lastid;
+    pl_head->arrivalTime = genexp(avgArrivalTime);
     pl_head->startTime = 0.0;
     pl_head->reStartTime = 0.0;
     pl_head->finishTime = 0.0;
-    pl_head->burst = genexp(mu);
+//    pl_head->burst = genexp(mu);
+    pl_head->burst = genexp(avgServiceTime);
     pl_head->remainingTime = pl_head->burst;
-    pl_head->pNext = NULL;
+    pl_head->pl_next = NULL;
 
     eq_head = new eventQNode;
     eq_head->time = pl_head->arrivalTime;
     eq_head->type = ARRIVE;
-    eq_head->eNext = NULL;
-    eq_head->pLink = pl_head;
+    eq_head->eq_next = NULL;
+    eq_head->p_link = pl_head;
 }
 
 
 ////////////////////////////////////////////////////////////////
 void generate_report()
 {
-    // output statistics
     clog << "outputting stats\n";
+    ofstream data("data.txt",  ios::out | ios::app);
+    data << "Average Turnaround Time\n";// << lambda << "\t\t" << getAvgTurnaround();
+//    if (data.is_open())
+//    {
+//    }
+//    else cout << "Unable to open file";
+//        data.close();
 }
 
 
 int genID() { return ++lastid; }
 
 
-void addToEventQ(event *newEvent)
-{
-    debugging(newEvent);
-//    eventQ.push(newEvent);
-}
+//void addToEventQ(event *newEvent)
+//{
+//    debugging(newEvent);
+////    eventQ.push(newEvent);
+//}
 
 
-void debugging(event *newEvent)
-{
-    clog << "DEBUG [" << cpu_head->clock << "] - adding event: ";
-    switch (newEvent->type) {
-        case ARRIVE: clog << "ARRIVE"; break;
-        case DEPARTURE: clog << "DEPARTURE"; break;
-        case DISPATCH: clog << "DISPATCH"; break;
-        default: cerr << "invalid type";
-    }
-    clog << "\n\twill happen at time: [" << newEvent->time << "]\n"
-         << "\tattached to process id: [" << newEvent->pid << "]\n";
-
-//    clog << "\n\tQUEUE SIZES:"
-//         << "\tevent: [" << eventQ.size()
-//         << "]\tready: [" << readyQ.size()
-//         << "] process list: [" << pList.size() << "]\n";
-}
+//void debugging(event *newEvent)
+//{
+//    clog << "DEBUG [" << cpu_head->clock << "] - adding event: ";
+//    switch (newEvent->type) {
+//        case ARRIVE: clog << "ARRIVE"; break;
+//        case DEPARTURE: clog << "DEPARTURE"; break;
+//        case DISPATCH: clog << "DISPATCH"; break;
+//        default: cerr << "invalid type";
+//    }
+//    clog << "\n\twill happen at time: [" << newEvent->time << "]\n"
+//         << "\tattached to process id: [" << newEvent->pid << "]\n";
+//
+////    clog << "\n\tQUEUE SIZES:"
+////         << "\tevent: [" << eventQ.size()
+////         << "]\tready: [" << readyQ.size()
+////         << "] process list: [" << pList.size() << "]\n";
+//}
 
 
 ////////////////////////////////////////////////////////////////
@@ -126,23 +139,25 @@ void scheduleArrival()
 {
 
     procListNode *pl_cursor = pl_head;
-    while (pl_cursor->pNext != NULL)
-        pl_cursor = pl_cursor->pNext;
+    while (pl_cursor->pl_next != NULL)
+        pl_cursor = pl_cursor->pl_next;
 
-    pl_cursor->pNext = new procListNode;
-    pl_cursor->pNext->arrivalTime = pl_cursor->arrivalTime + genexp((float)lambda);
-    pl_cursor->pNext->startTime = 0.0;
-    pl_cursor->pNext->reStartTime = 0.0;
-    pl_cursor->pNext->finishTime = 0.0;
-    pl_cursor->pNext->burst = genexp(mu);
-    pl_cursor->pNext->remainingTime = pl_cursor->pNext->burst;
-    pl_cursor->pNext->pNext = NULL;
+    pl_cursor->pl_next = new procListNode;
+    pl_cursor->pl_next->pid = pl_cursor->pid + 1;
+    pl_cursor->pl_next->arrivalTime = pl_cursor->arrivalTime + genexp(avgArrivalTime);
+    pl_cursor->pl_next->startTime = 0.0;
+    pl_cursor->pl_next->reStartTime = 0.0;
+    pl_cursor->pl_next->finishTime = 0.0;
+    pl_cursor->pl_next->burst = genexp(avgServiceTime);
+//    pl_cursor->pl_next->burst = genexp(mu);
+    pl_cursor->pl_next->remainingTime = pl_cursor->pl_next->burst;
+    pl_cursor->pl_next->pl_next = NULL;
 
     eventQNode *arrival = new eventQNode;
-    arrival->time = pl_cursor->pNext->arrivalTime;
+    arrival->time = pl_cursor->pl_next->arrivalTime;
     arrival->type = ARRIVE;
-    arrival->pLink = pl_cursor->pNext;
-    arrival->eNext = NULL;
+    arrival->p_link = pl_cursor->pl_next;
+    arrival->eq_next = NULL;
 
     insertIntoEventQ(arrival);
 }
@@ -151,18 +166,18 @@ void scheduleArrival()
 void handleArrival()
 {
     readyQNode *ready = new readyQNode;
-    ready->pLink = eq_head->pLink;
-    ready->rNext = NULL;
+    ready->p_link = eq_head->p_link;
+    ready->rq_next = NULL;
 
     if (rq_head == NULL)  //empty queue
         rq_head = ready;
     else
     {
         readyQNode *rq_cursor = rq_head;
-        while (rq_cursor->rNext != NULL)
-            rq_cursor = rq_cursor->rNext;
+        while (rq_cursor->rq_next != NULL)
+            rq_cursor = rq_cursor->rq_next;
 
-        rq_cursor->rNext = ready;
+        rq_cursor->rq_next = ready;
     }
 
     popEventQHead();
@@ -172,62 +187,60 @@ void handleArrival()
 void scheduleDispatch()
 {
 
-    eventQNode *nuAllocation = new eventQNode;
+    eventQNode *dispatch = new eventQNode;
 
     procListNode *nextProc;
-    if (schedulerType == _FCFS)
-        nextProc = rq_head->pLink;
-    else if (schedulerType == _SRTF)
+    if (scheduler == _FCFS)
+        nextProc = rq_head->p_link;
+    else if (scheduler == _SRTF)
     {
-        if (cpu_head->clock > rq_head->pLink->arrivalTime)
+        if (cpu_head->clock > rq_head->p_link->arrivalTime)
         {
 //            nextProc = getSRTProcess();
         }
         else
         {
-            nextProc = rq_head->pLink;
+            nextProc = rq_head->p_link;
         }
     }
-    else if (schedulerType == _RR)
+    else if (scheduler == _RR)
     {
 //        nextProc = getHRRProcess();
     }
 
     if (cpu_head->clock < nextProc->arrivalTime)
-        nuAllocation->time = nextProc->arrivalTime;
-
+        dispatch->time = nextProc->arrivalTime;
     else
-        nuAllocation->time = cpu_head->clock;
+        dispatch->time = cpu_head->clock;
 
-    nuAllocation->type = DISPATCH;
-    nuAllocation->eNext = NULL;
-    nuAllocation->pLink = nextProc;
+    dispatch->type = DISPATCH;
+    dispatch->eq_next = NULL;
+    dispatch->p_link = nextProc;
 
-    insertIntoEventQ(nuAllocation);
+    insertIntoEventQ(dispatch);
 }
 
 void handleDispatch()
 {
-    cpu_head->pLink = eq_head->pLink;  //assign process to CPU
+    cpu_head->p_link = eq_head->p_link;  //assign process to CPU
 
-    if (schedulerType == _SRTF || schedulerType == _RR)
+    if (scheduler == _SRTF || scheduler == _RR)
     {
-
-        readyQNode *rq_cursor = rq_head->rNext;
+        readyQNode *rq_cursor = rq_head->rq_next;
         readyQNode *rq_precursor = rq_head;
-        if (rq_precursor->pLink->arrivalTime != eq_head->pLink->arrivalTime)
+        if (rq_precursor->p_link->arrivalTime != eq_head->p_link->arrivalTime)
         {
             while (rq_cursor != NULL)
             {
-                if (rq_cursor->pLink->arrivalTime == eq_head->pLink->arrivalTime)
+                if (rq_cursor->p_link->arrivalTime == eq_head->p_link->arrivalTime)
                 {
-                    rq_precursor->rNext = rq_cursor->rNext;
-                    rq_cursor->rNext = rq_head;
+                    rq_precursor->rq_next = rq_cursor->rq_next;
+                    rq_cursor->rq_next = rq_head;
                     rq_head = rq_cursor;
                     break;
                 }
-                rq_cursor = rq_cursor->rNext;
-                rq_precursor = rq_precursor->rNext;
+                rq_cursor = rq_cursor->rq_next;
+                rq_precursor = rq_precursor->rq_next;
             }
         }
     }
@@ -235,49 +248,50 @@ void handleDispatch()
     popReadyQHead();
     popEventQHead();
 
-    cpu_head->cpuBusy = true;    //CPU now busy executing process
+    cpu_head->busy = true;    //CPU now busy executing process
 
-    if (cpu_head->clock < cpu_head->pLink->arrivalTime)
-        cpu_head->clock = cpu_head->pLink->arrivalTime;
+    //set clock to time of process arrival
+    if (cpu_head->clock < cpu_head->p_link->arrivalTime)
+        cpu_head->clock = cpu_head->p_link->arrivalTime;
 
-    if (cpu_head->pLink->startTime == 0)
-        cpu_head->pLink->startTime = cpu_head->clock;
+    if (cpu_head->p_link->startTime == 0)
+        cpu_head->p_link->startTime = cpu_head->clock;
     else
-        cpu_head->pLink->reStartTime = cpu_head->clock;
+        cpu_head->p_link->reStartTime = cpu_head->clock;
 }
 
 void scheduleDeparture()
 {
-    eventQNode *nuDeparture = new eventQNode;
-    nuDeparture->type = DEPARTURE;
-    nuDeparture->eNext = NULL;
-    nuDeparture->pLink = cpu_head->pLink;
+    eventQNode *departure = new eventQNode;
+    departure->type = DEPARTURE;
+    departure->eq_next = NULL;
+    departure->p_link = cpu_head->p_link;
 
-    if (schedulerType == _FCFS || schedulerType == _RR)
-        nuDeparture->time = cpu_head->pLink->startTime + cpu_head->pLink->remainingTime;  //FCFS will process to completion
+    if (scheduler == _FCFS || scheduler == _RR)
+        departure->time = cpu_head->p_link->startTime + cpu_head->p_link->remainingTime;  //FCFS will process to completion
 
-    else if (schedulerType == _SRTF)
+    else if (scheduler == _SRTF)
     {
-        if (cpu_head->pLink->reStartTime == 0)
-            nuDeparture->time = cpu_head->pLink->startTime + cpu_head->pLink->remainingTime;
+        if (cpu_head->p_link->reStartTime == 0)
+            departure->time = cpu_head->p_link->startTime + cpu_head->p_link->remainingTime;
         else
-            nuDeparture->time = cpu_head->pLink->reStartTime + cpu_head->pLink->remainingTime;
+            departure->time = cpu_head->p_link->reStartTime + cpu_head->p_link->remainingTime;
     }
 
-    insertIntoEventQ(nuDeparture);
+    insertIntoEventQ(departure);
 }
 
 void handleDeparture()
 {
     cpu_head->clock = eq_head->time;   //set clock to head of event queue
 
-    cpu_head->pLink->finishTime = cpu_head->clock;    //log finishTime
-    pl_head->finishTime = cpu_head->pLink->finishTime;
+    cpu_head->p_link->finishTime = cpu_head->clock;    //log finishTime
+    pl_head->finishTime = cpu_head->p_link->finishTime;
 
-    cpu_head->pLink->remainingTime = 0.0;    //clear remainingTime
-    cpu_head->pLink = NULL;
+    cpu_head->p_link->remainingTime = 0.0;    //clear remainingTime
+    cpu_head->p_link = NULL;
 
-    cpu_head->cpuBusy = false;   //CPU ready for next process
+    cpu_head->busy = false;   //CPU ready for next process
 
     popEventQHead();    //remove departure event
 }
@@ -291,7 +305,7 @@ void schedulePreemption()
 ////////////////////////////////////////////////////////////
 int run_sim()
 {
-    switch (schedulerType)
+    switch (scheduler)
     {
         case _FCFS: cout << "Scheduling as FCFS\n\n";
             FCFS();
@@ -302,7 +316,7 @@ int run_sim()
         case _RR: cout << "Scheduling as RR\n\n";
             RR();
             break;
-        default: cerr << "invalid schedulerType\n"; return 1;
+        default: cerr << "invalid scheduler\n"; return 1;
     }
     return 0;
 }
@@ -310,13 +324,13 @@ int run_sim()
 
 void FCFS()
 {
-    int p_count = 0;
+    int arrivalCount = 0;
     int departureCount = 0;
-    int allocationCount = 0;
+    int dispatchCount = 0;
 
     while (departureCount < MAX_PROCESSES)
     {
-        if (!cpu_head->cpuBusy)
+        if (!cpu_head->busy)
         {
             scheduleArrival();
             if (rq_head != NULL)
@@ -329,11 +343,11 @@ void FCFS()
         {
             case ARRIVE:
                 handleArrival();
-                p_count++;
+                arrivalCount++;
                 break;
             case DISPATCH:
                 handleDispatch();
-                allocationCount++;
+                dispatchCount++;
                 break;
             case DEPARTURE:
                 handleDeparture();
@@ -343,9 +357,9 @@ void FCFS()
                 cerr << "invalid event type\n";
         }
     }
-    cout << "Arrival Count: " << p_count << endl;
+    cout << "Arrival Count: " << arrivalCount << endl;
+    cout << "Dispatch Count: " << dispatchCount << endl;
     cout << "Departure Count: " << departureCount << endl;
-    cout << "Allocation Count: " << allocationCount << endl;
 }
 
 // The event queue is treated as a priority queue by sorting
@@ -356,7 +370,7 @@ void insertIntoEventQ(eventQNode *newEvent)
         eq_head = newEvent;
     else if (eq_head->time > newEvent->time)   //add to front
     {
-        newEvent->eNext = eq_head;
+        newEvent->eq_next = eq_head;
         eq_head = newEvent;
     }
     else
@@ -364,19 +378,19 @@ void insertIntoEventQ(eventQNode *newEvent)
         eventQNode *eq_cursor = eq_head;
         while (eq_cursor != NULL)
         {
-            if ((eq_cursor->time < newEvent->time) && (eq_cursor->eNext == NULL))  //add to tail
+            if ((eq_cursor->time < newEvent->time) && (eq_cursor->eq_next == NULL))  //add to tail
             {
-                eq_cursor->eNext = newEvent;
+                eq_cursor->eq_next = newEvent;
                 break;
             }
-            else if ((eq_cursor->time < newEvent->time) && (eq_cursor->eNext->time > newEvent->time))   //add inside
+            else if ((eq_cursor->time < newEvent->time) && (eq_cursor->eq_next->time > newEvent->time))   //add inside
             {
-                newEvent->eNext = eq_cursor->eNext;
-                eq_cursor->eNext = newEvent;
+                newEvent->eq_next = eq_cursor->eq_next;
+                eq_cursor->eq_next = newEvent;
                 break;
             }
             else
-                eq_cursor = eq_cursor->eNext;
+                eq_cursor = eq_cursor->eq_next;
         }
     }
 }
@@ -384,7 +398,7 @@ void insertIntoEventQ(eventQNode *newEvent)
 void popEventQHead()
 {
     eventQNode *tempPtr = eq_head;
-    eq_head = eq_head->eNext;
+    eq_head = eq_head->eq_next;
     delete tempPtr;
 }
 
@@ -392,7 +406,7 @@ void popEventQHead()
 void popReadyQHead()
 {
     readyQNode *tempPtr = rq_head;
-    rq_head = rq_head->rNext;
+    rq_head = rq_head->rq_next;
     delete tempPtr;
 }
 
@@ -407,29 +421,43 @@ void RR()
     //TODO
 }
 
-float getTurnaroundTime()
+float getAvgTurnaround()
 {
     float totalTurnaround = 0.0,
             avgTurnaround = 0.0;
 
     if (pl_head == NULL)  //empty queue
         cerr << "empty queue";
-    else {
+    else
+    {
         procListNode *pl_cursor = pl_head;
-        while (pl_cursor->pNext != NULL)
+        while (pl_cursor->pl_next != NULL)
         {
-            totalTurnaround += (pl_cursor->finishTime - pl_cursor->arrivalTime);
-            pl_cursor = pl_cursor->pNext;
+            if (pl_cursor->finishTime != 0)
+            {
+                float tmp = pl_cursor->finishTime - pl_cursor->arrivalTime;
+                cout << pl_cursor->pid << ": " << "pl_cursor->finishTime - pl_cursor->arrivalTime: "
+                    << pl_cursor->finishTime << " - " << pl_cursor->arrivalTime << " = " << tmp << endl;
+                totalTurnaround += (pl_cursor->finishTime - pl_cursor->arrivalTime);
+                //            cout << "totalTurnaround: " << totalTurnaround << endl;
+
+            }
+            pl_cursor = pl_cursor->pl_next;
         }
-    avgTurnaround = MAX_PROCESSES / totalTurnaround;
-    return avgTurnaround;
     }
+//    cout << "totalTurnaround: " << totalTurnaround << endl;
+    avgTurnaround = totalTurnaround / MAX_PROCESSES;
+    return avgTurnaround;
 }
 
+int outPut()
+{
+
+}
 ////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[] )
 {
-    clog << "hello";
+    clog << "hello\n";
 
     if (argc < 3)
     {

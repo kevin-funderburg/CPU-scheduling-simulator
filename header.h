@@ -9,12 +9,15 @@
 
 #include <deque>
 #include <list>
+
 using namespace std;
-#define MAX_PROCESSES 10000
+#define MAX_PROCESSES 10
 
 ////////////////////////////////////////////////////////////////
 enum State {READY = 0, RUNNING = 1, TERMINATED = 3};
 enum Scheduler {_FCFS = 1, _SRTF = 2, _RR = 3};
+enum EventType {ARRIVE = 1, DISPATCH = 2, DEPARTURE = 3};
+
 ////////////////////////////////////////////////////////////////
 //struct process
 ////{
@@ -30,42 +33,42 @@ enum Scheduler {_FCFS = 1, _SRTF = 2, _RR = 3};
 
 struct procListNode
 {
+    int pid;
     float arrivalTime;
     float startTime;
     float reStartTime;
     float finishTime;
     float burst;
     float remainingTime;
-    struct procListNode *pNext;
+    struct procListNode *pl_next;
 };
 
 struct cpuNode
 {
     float clock;
-    bool cpuBusy;
-    int pid;
-    struct procListNode *pLink;
+    bool busy;
+    struct procListNode *p_link;
 };
 
 struct readyQNode
 {
-    struct procListNode *pLink;
-    struct readyQNode *rNext;
+    struct procListNode *p_link;
+    struct readyQNode *rq_next;
 };
 
 struct eventQNode
 {
     float time;
-    int type;
+    EventType type;
 
-    struct eventQNode *eNext;
-    struct procListNode *pLink;
+    struct eventQNode *eq_next;
+    struct procListNode *p_link;
 };
 
 //struct procListNode
 //{
 //    process p;
-//    struct procListNode *pNext;
+//    struct procListNode *pl_next;
 //};
 
 
@@ -80,11 +83,12 @@ struct eventQNode
 //list <process> pList;
 //process p_table[MAX_PROCESSES + 200];
 
-Scheduler schedulerType;
+Scheduler scheduler;
 
 // Global Variables
 float avgArrivalTime;
 int lambda;
+//float lambda;
 int lastid;
 float avgServiceTime;
 float quantum;
@@ -119,6 +123,8 @@ void generate_report();
 float urand();
 float genexp(float);
 
+float getAvgTurnaround();
+int outPut();
 
 void scheduleArrival();
 void scheduleDeparture();
@@ -126,8 +132,8 @@ void scheduleDispatch();
 void handleDispatch();
 void schedulePreemption();
 void handleArrival();
-void debugging(event *newEvent);
-void addToEventQ(event *newEvent);
+//void debugging(event *newEvent);
+//void addToEventQ(event *newEvent);
 // Initializations
 void insertIntoEventQ(eventQNode *);
 void popEventQHead();
