@@ -76,8 +76,7 @@ void init()
 void generate_report()
 {
 //    clog << "outputting stats\n";
-    cout << pwd;
-    ofstream data("../../data.txt",  ios::out | ios::app);
+    ofstream data("sim.data",  ios::out | ios::app);
     if (data.is_open())
     {
         cout << lambda << "\t\t" << getAvgTurnaround();
