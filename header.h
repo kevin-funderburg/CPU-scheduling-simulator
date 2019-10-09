@@ -11,7 +11,7 @@
 #include <list>
 
 using namespace std;
-#define MAX_PROCESSES 10
+#define MAX_PROCESSES 10000
 
 ////////////////////////////////////////////////////////////////
 enum State {READY = 0, RUNNING = 1, TERMINATED = 3};

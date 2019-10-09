@@ -42,7 +42,6 @@ static void show_usage()
 
 void init()
 {
-//    mu = (float)1.0 / avgServiceTime;
     quantumClock = 0.0;
     lastid = 0;
 
@@ -59,7 +58,6 @@ void init()
     pl_head->startTime = 0.0;
     pl_head->reStartTime = 0.0;
     pl_head->finishTime = 0.0;
-//    pl_head->burst = genexp(mu);
     pl_head->burst = genexp(avgServiceTime);
     pl_head->remainingTime = pl_head->burst;
     pl_head->pl_next = NULL;
@@ -75,12 +73,11 @@ void init()
 ////////////////////////////////////////////////////////////////
 void generate_report()
 {
-//    clog << "outputting stats\n";
     ofstream data("sim.data",  ios::out | ios::app);
     if (data.is_open())
     {
         cout << lambda << "\t\t" << getAvgTurnaround();
-        data << lambda << "\t\t" << getAvgTurnaround();
+        data << lambda << "\t\t" << getAvgTurnaround() << endl;
         data.close();
     }
     else cout << "Unable to open file";
@@ -88,32 +85,6 @@ void generate_report()
 
 
 int genID() { return ++lastid; }
-
-
-//void addToEventQ(event *newEvent)
-//{
-//    debugging(newEvent);
-////    eventQ.push(newEvent);
-//}
-
-
-//void debugging(event *newEvent)
-//{
-//    clog << "DEBUG [" << cpu_head->clock << "] - adding event: ";
-//    switch (newEvent->type) {
-//        case ARRIVE: clog << "ARRIVE"; break;
-//        case DEPARTURE: clog << "DEPARTURE"; break;
-//        case DISPATCH: clog << "DISPATCH"; break;
-//        default: cerr << "invalid type";
-//    }
-//    clog << "\n\twill happen at time: [" << newEvent->time << "]\n"
-//         << "\tattached to process id: [" << newEvent->pid << "]\n";
-//
-////    clog << "\n\tQUEUE SIZES:"
-////         << "\tevent: [" << eventQ.size()
-////         << "]\tready: [" << readyQ.size()
-////         << "] process list: [" << pList.size() << "]\n";
-//}
 
 
 ////////////////////////////////////////////////////////////////
@@ -150,7 +121,6 @@ void scheduleArrival()
     pl_cursor->pl_next->reStartTime = 0.0;
     pl_cursor->pl_next->finishTime = 0.0;
     pl_cursor->pl_next->burst = genexp(avgServiceTime);
-//    pl_cursor->pl_next->burst = genexp(mu);
     pl_cursor->pl_next->remainingTime = pl_cursor->pl_next->burst;
     pl_cursor->pl_next->pl_next = NULL;
 
@@ -395,7 +365,7 @@ void insertIntoEventQ(eventQNode *newEvent)
         }
     }
 }
-// Helper Function
+
 void popEventQHead()
 {
     eventQNode *tempPtr = eq_head;
@@ -403,7 +373,6 @@ void popEventQHead()
     delete tempPtr;
 }
 
-// Helper Function
 void popReadyQHead()
 {
     readyQNode *tempPtr = rq_head;
@@ -432,23 +401,34 @@ float getAvgTurnaround()
     else
     {
         procListNode *pl_cursor = pl_head;
-        while (pl_cursor->pl_next != NULL)
+        while (pl_cursor->finishTime != 0)
         {
-            if (pl_cursor->finishTime != 0)
-            {
+
 //                float tmp = pl_cursor->finishTime - pl_cursor->arrivalTime;
 //                cout << pl_cursor->pid << ": " << "pl_cursor->finishTime - pl_cursor->arrivalTime: "
 //                    << pl_cursor->finishTime << " - " << pl_cursor->arrivalTime << " = " << tmp << endl;
                 totalTurnaround += (pl_cursor->finishTime - pl_cursor->arrivalTime);
                 //            cout << "totalTurnaround: " << totalTurnaround << endl;
 
-            }
+
             pl_cursor = pl_cursor->pl_next;
         }
+//        while (pl_cursor->pl_next != NULL)
+//        {
+//            if (pl_cursor->finishTime != 0)
+//            {
+////                float tmp = pl_cursor->finishTime - pl_cursor->arrivalTime;
+////                cout << pl_cursor->pid << ": " << "pl_cursor->finishTime - pl_cursor->arrivalTime: "
+////                    << pl_cursor->finishTime << " - " << pl_cursor->arrivalTime << " = " << tmp << endl;
+//                totalTurnaround += (pl_cursor->finishTime - pl_cursor->arrivalTime);
+//                //            cout << "totalTurnaround: " << totalTurnaround << endl;
+//
+//            }
+//            pl_cursor = pl_cursor->pl_next;
+//        }
     }
 //    cout << "totalTurnaround: " << totalTurnaround << endl;
-    avgTurnaround = totalTurnaround / MAX_PROCESSES;
-    return avgTurnaround;
+    return totalTurnaround / MAX_PROCESSES;
 }
 
 int outPut()
