@@ -406,7 +406,7 @@ void RR()
         {
             scheduleArrival();
             if (rq_head != NULL)
-                scheduleQuantumAllocation();
+                scheduleQuantumDispatch();
         }
         else
         {
@@ -414,7 +414,7 @@ void RR()
                 scheduleQuantumDeparture();
             else
             {
-                if (rq_head != 0)
+                if (rq_head != NULL)
                 {
                     if (rq_head->p_link->arrivalTime > cpuEstFinishTime())
                         scheduleQuantumDeparture();
@@ -429,14 +429,14 @@ void RR()
                 handleArrival();
                 break;
             case DISPATCH:
-                handleQuantumAllocation();
+                handleQuantumDispatch();
                 break;
             case DEPARTURE:
                 handleQuantumDeparture();
                 departureCount++;
 
                 if (rq_head != NULL && (rq_head->p_link->arrivalTime < cpu_head->clock))
-                    scheduleQuantumAllocation();
+                    scheduleQuantumDispatch();
                 break;
             case PREEMPT:
                 handleQuantumPreemption();
@@ -445,9 +445,9 @@ void RR()
     }
 }
 
-void scheduleQuantumAllocation()
+void scheduleQuantumDispatch()
 {
-    eventQNode *nuAllocation = new eventQNode;
+    eventQNode *dispatch = new eventQNode;
 
     procListNode *nextProc;
     nextProc = rq_head->p_link;
@@ -455,7 +455,7 @@ void scheduleQuantumAllocation()
     if (rq_head != NULL)
     {
         if (rq_head->p_link->arrivalTime < cpu_head->clock)
-            nuAllocation->time = cpu_head->clock;
+            dispatch->time = cpu_head->clock;
         else
         {
             cpu_head->clock = rq_head->p_link->arrivalTime;
@@ -465,20 +465,20 @@ void scheduleQuantumAllocation()
                 nextQuantumTime += quantum;
             quantumClock = nextQuantumTime;
 
-            nuAllocation->time = getNextQuantumAllocationTime();
+            dispatch->time = getNextQuantumDispatchTime();
         }
     }
     else
-        cout << "Error in scheduleQuantumAllocation()" << endl;
+        cerr << "Error in scheduleQuantumDispatch()" << endl;
 
-    nuAllocation->type = 3;
-    nuAllocation->eq_next = 0;
-    nuAllocation->p_link = nextProc;
+    dispatch->type = DISPATCH;
+    dispatch->eq_next = NULL;
+    dispatch->p_link = nextProc;
 
-    insertIntoEventQ(nuAllocation);
+    insertIntoEventQ(dispatch);
 }
 
-void handleQuantumAllocation()
+void handleQuantumDispatch()
 {
     cpu_head->p_link = eq_head->p_link;
     cpu_head->busy = true;
@@ -495,8 +495,8 @@ void handleQuantumAllocation()
 void scheduleQuantumDeparture()
 {
     eventQNode *nuDeparture = new eventQNode;
-    nuDeparture->type = 2;
-    nuDeparture->eq_next = 0;
+    nuDeparture->type = DEPARTURE;
+    nuDeparture->eq_next = NULL;
     nuDeparture->p_link = cpu_head->p_link;
 
     if (cpu_head->p_link->reStartTime == 0)
@@ -511,7 +511,7 @@ void handleQuantumDeparture()
 {
     cpu_head->p_link->finishTime = eq_head->time;
     cpu_head->p_link->remainingTime = 0.0;
-    cpu_head->p_link = 0;
+    cpu_head->p_link = NULL;
     cpu_head->clock = eq_head->time;
     cpu_head->busy = false;
 
@@ -521,8 +521,8 @@ void handleQuantumDeparture()
 void scheduleQuantumPreemption()
 {
     eventQNode *preemption = new eventQNode;
-    preemption->type = 4;
-    preemption->eq_next = 0;
+    preemption->type = PREEMPT;
+    preemption->eq_next = NULL;
 
     cpu_head->clock = rq_head->p_link->arrivalTime;
 
@@ -541,7 +541,6 @@ void scheduleQuantumPreemption()
 
 void handleQuantumPreemption()
 {
-
     procListNode *preemptedProcPtr = cpu_head->p_link;
 
     cpu_head->p_link->remainingTime = cpuEstFinishTime() - eq_head->time;
@@ -562,8 +561,8 @@ void handleQuantumPreemption()
 
     eventQNode *preemptedProcArrival = new eventQNode;
     preemptedProcArrival->time = eq_head->time;
-    preemptedProcArrival->type = 1;
-    preemptedProcArrival->eq_next = 0;
+    preemptedProcArrival->type = ARRIVE;
+    preemptedProcArrival->eq_next = NULL;
     preemptedProcArrival->p_link = preemptedProcPtr;
 
     popEventQHead();
@@ -574,7 +573,7 @@ void handleQuantumPreemption()
 
 float getNextQuantumClockTime(){ return quantumClock + quantum; }
 
-float getNextQuantumAllocationTime()
+float getNextQuantumDispatchTime()
 {
     float nextQuantumTime = quantumClock;
     while (nextQuantumTime < rq_head->p_link->arrivalTime)

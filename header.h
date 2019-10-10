@@ -96,7 +96,7 @@ float genexp(float);
 
 float getAvgTurnaround();
 float getTotalThroughput();
-float cpuEstFinishTime()
+float cpuEstFinishTime();
 
 void scheduleArrival();
 void scheduleDeparture();
@@ -105,13 +105,13 @@ void handleDispatch();
 void schedulePreemption();
 void handleArrival();
 
-void scheduleQuantumAllocation();
-void handleQuantumAllocation();
+void scheduleQuantumDispatch();
+void handleQuantumDispatch();
 void scheduleQuantumDeparture();
 void handleQuantumDeparture();
 void scheduleQuantumPreemption();
 void handleQuantumPreemption();
-float getNextQuantumAllocationTime();
+float getNextQuantumDispatchTime();
 float getNextQuantumClockTime();
 
 // Initializations
