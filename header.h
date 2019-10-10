@@ -114,6 +114,9 @@ void handleQuantumPreemption();
 float getNextQuantumDispatchTime();
 float getNextQuantumClockTime();
 
+procListNode *getSRTProcess();
+procListNode *getHRRProcess();
+float getResponseRatioValue(procListNode *);
 // Initializations
 void insertIntoEventQ(eventQNode *);
 void popEventQHead();
