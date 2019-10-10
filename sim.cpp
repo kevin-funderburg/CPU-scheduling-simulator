@@ -171,23 +171,15 @@ void scheduleDispatch()
     else if (scheduler == _SRTF)
     {
         if (cpu_head->clock > rq_head->p_link->arrivalTime)
-        {
-//            nextProc = getSRTProcess();
-        }
+            nextProc = getSRTProcess();
         else
-        {
             nextProc = rq_head->p_link;
-        }
-    }
-    else if (scheduler == _RR)
-    {
-//        nextProc = getHRRProcess();
     }
 
-    if (cpu_head->clock < nextProc->arrivalTime)
-        dispatch->time = nextProc->arrivalTime;
-    else
-        dispatch->time = cpu_head->clock;
+    else if (scheduler == _RR)
+        nextProc = getHRRProcess();
+
+    dispatch->time = cpu_head->clock < nextProc->arrivalTime ? nextProc->arrivalTime : cpu_head->clock;
 
     dispatch->type = DISPATCH;
     dispatch->eq_next = nullptr;
@@ -306,8 +298,7 @@ void FCFS()
         if (!cpu_head->busy)
         {
             scheduleArrival();
-            if (rq_head != nullptr)
-                scheduleDispatch();
+            if (rq_head != nullptr) scheduleDispatch();
         }
         else
             scheduleDeparture();
@@ -402,8 +393,7 @@ void RR()
         if (!cpu_head->busy)
         {
             scheduleArrival();
-            if (rq_head != nullptr)
-                scheduleQuantumDispatch();
+            if (rq_head != nullptr) scheduleQuantumDispatch();
         }
         else
         {
@@ -431,7 +421,6 @@ void RR()
             case DEPARTURE:
                 handleQuantumDeparture();
                 departureCount++;
-
                 if (rq_head != nullptr && (rq_head->p_link->arrivalTime < cpu_head->clock))
                     scheduleQuantumDispatch();
                 break;
@@ -481,7 +470,7 @@ void handleQuantumDispatch()
     cpu_head->busy = true;
 
     if (cpu_head->p_link->startTime == 0)
-        cpu_head->p_link->startTime = eq_head->time;
+        cpu_head->p_link->startTime;
     else
         cpu_head->p_link->reStartTime = eq_head->time;
 
@@ -544,11 +533,8 @@ void handleQuantumPreemption()
 
     cpu_head->p_link = eq_head->p_link;
     cpu_head->clock = eq_head->time;
-    if (cpu_head->p_link->startTime == 0.0)
-        cpu_head->p_link->startTime = eq_head->time;
 
-    else
-        cpu_head->p_link->reStartTime = eq_head->time;
+    cpu_head->p_link->startTime == 0.0 ? cpu_head->p_link->startTime : cpu_head->p_link->reStartTime = eq_head->time;
 
     float nextQuantumTime = quantumClock;
     while (nextQuantumTime < eq_head->time)
@@ -586,10 +572,7 @@ float cpuEstFinishTime()
     float reStartTime = cpu_head->p_link->reStartTime;
     float remainingTime = cpu_head->p_link->remainingTime;
 
-    if (reStartTime == 0)
-        estFinish = startTime + remainingTime;
-    else
-        estFinish = reStartTime + remainingTime;
+    estFinish = (reStartTime == 0 ? startTime : reStartTime) + remainingTime;
 
     return estFinish;
 }
@@ -686,10 +669,7 @@ float getTotalThroughput()
 
     while (pl_cursor->pl_next != nullptr)
     {
-        if (pl_cursor->finishTime == 0)
-            count++;
-        else
-            finTime = pl_cursor->finishTime;
+        pl_cursor->finishTime == 0 ? (count++) : (finTime = pl_cursor->finishTime);
 
         pl_cursor = pl_cursor->pl_next;
     }
