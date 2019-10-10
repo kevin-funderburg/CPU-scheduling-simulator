@@ -10,6 +10,7 @@
 // Use 105 ms for the preemptive _SRTF
 /////////////////////////////////////////////////
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <cstdlib>
 #include <cmath>
@@ -76,8 +77,14 @@ void generate_report()
     ofstream data("sim.data",  ios::out | ios::app);
     if (data.is_open())
     {
-        cout << lambda << "\t\t" << getAvgTurnaround();
-        data << lambda << "\t\t" << getAvgTurnaround() << endl;
+        if (lambda == 1)
+        {
+            data << "---------------------------------------------------------------------------------------------------------------\n"
+                 << "lambda\tAvgTurnaround\tThroughput\n"
+                 << "---------------------------------------------------------------------------------------------------------------\n";
+        }
+        data << lambda << "\t\t" << getAvgTurnaround() << "\t\t\t" << getTotalThroughput() << endl;
+
         data.close();
     }
     else cout << "Unable to open file";
@@ -386,8 +393,201 @@ void SRTF()
 
 void RR()
 {
-    //TODO
+    int arrivalCount = 0;
+    int departureCount = 0;
+    while (departureCount < MAX_PROCESSES)
+    {
+        if (arrivalCount < (MAX_PROCESSES * 1.20))
+        {
+            scheduleArrival();
+            arrivalCount++;
+        }
+        if (!cpu_head->busy)
+        {
+            scheduleArrival();
+            if (rq_head != NULL)
+                scheduleQuantumAllocation();
+        }
+        else
+        {
+            if (cpuEstFinishTime() < getNextQuantumClockTime())
+                scheduleQuantumDeparture();
+            else
+            {
+                if (rq_head != 0)
+                {
+                    if (rq_head->p_link->arrivalTime > cpuEstFinishTime())
+                        scheduleQuantumDeparture();
+                    else
+                        scheduleQuantumPreemption();
+                }
+            }
+        }
+
+        if (eq_head->type == 1)
+            handleArrival();
+        else if (eq_head->type == 2)
+        {
+            handleQuantumDeparture();
+            departureCount++;
+
+            if (rq_head != NULL && (rq_head->p_link->arrivalTime < cpu_head->clock))
+                scheduleQuantumAllocation();
+        }
+        else if (eq_head->type == 3)
+            handleQuantumAllocation();
+        else if (eq_head->type == 4)
+            handleQuantumPreemption();
+    }
 }
+
+void scheduleQuantumAllocation()
+{
+
+    eventQNode *nuAllocation = new eventQNode;
+
+    procListNode *nextProc;
+    nextProc = rq_head->p_link;
+
+    if (rq_head != NULL)
+    {
+        if (rq_head->p_link->arrivalTime < cpu_head->clock)
+            nuAllocation->time = cpu_head->clock;
+        else
+        {
+            cpu_head->clock = rq_head->p_link->arrivalTime;
+
+            float nextQuantumTime = quantumClock;
+            while (nextQuantumTime < cpu_head->clock)
+                nextQuantumTime += quantum;
+            quantumClock = nextQuantumTime;
+
+            nuAllocation->time = getNextQuantumAllocationTime();
+        }
+    }
+    else
+        cout << "Error in scheduleQuantumAllocation()" << endl;
+
+    nuAllocation->type = 3;
+    nuAllocation->eq_next = 0;
+    nuAllocation->p_link = nextProc;
+
+    insertIntoEventQ(nuAllocation);
+}
+
+void handleQuantumAllocation()
+{
+
+    cpu_head->p_link = eq_head->p_link;
+
+    cpu_head->busy = true;
+
+    if (cpu_head->p_link->startTime == 0)
+        cpu_head->p_link->startTime = eq_head->time;
+    else
+        cpu_head->p_link->reStartTime = eq_head->time;
+
+    popReadyQHead();
+    popEventQHead();
+}
+
+void scheduleQuantumDeparture()
+{
+
+    eventQNode *nuDeparture = new eventQNode;
+    nuDeparture->type = 2;
+    nuDeparture->eq_next = 0;
+    nuDeparture->p_link = cpu_head->p_link;
+
+    if (cpu_head->p_link->reStartTime == 0)
+    {
+        nuDeparture->time = cpu_head->p_link->startTime + cpu_head->p_link->remainingTime;
+    }
+    else
+    {
+        nuDeparture->time = cpu_head->p_link->reStartTime + cpu_head->p_link->remainingTime;
+    }
+
+    insertIntoEventQ(nuDeparture);
+}
+
+void handleQuantumDeparture()
+{
+    cpu_head->p_link->finishTime = eq_head->time;
+    cpu_head->p_link->remainingTime = 0.0;
+    cpu_head->p_link = 0;
+    cpu_head->clock = eq_head->time;
+    cpu_head->busy = false;
+
+    popEventQHead();
+}
+
+void scheduleQuantumPreemption()
+{
+
+    eventQNode *nuPreemption = new eventQNode;
+    nuPreemption->type = 4;
+    nuPreemption->eq_next = 0;
+
+    cpu_head->clock = rq_head->p_link->arrivalTime;
+
+    float nextQuantumTime = quantumClock;
+    while (nextQuantumTime < cpu_head->clock)
+        nextQuantumTime += quantum;
+
+    quantumClock = nextQuantumTime;
+
+    nuPreemption->time = getNextQuantumClockTime();
+
+    nuPreemption->p_link = rq_head->p_link;
+
+    insertIntoEventQ(nuPreemption);
+}
+
+void handleQuantumPreemption()
+{
+
+    procListNode *preemptedProcPtr = cpu_head->p_link;
+
+    cpu_head->p_link->remainingTime = cpuEstFinishTime() - eq_head->time;
+
+    cpu_head->p_link = eq_head->p_link;
+    cpu_head->clock = eq_head->time;
+    if (cpu_head->p_link->startTime == 0.0)
+        cpu_head->p_link->startTime = eq_head->time;
+
+    else
+        cpu_head->p_link->reStartTime = eq_head->time;
+
+    float nextQuantumTime = quantumClock;
+    while (nextQuantumTime < eq_head->time)
+        nextQuantumTime += quantum;
+
+    quantumClock = nextQuantumTime;
+
+    eventQNode *preemptedProcArrival = new eventQNode;
+    preemptedProcArrival->time = eq_head->time;
+    preemptedProcArrival->type = 1;
+    preemptedProcArrival->eq_next = 0;
+    preemptedProcArrival->p_link = preemptedProcPtr;
+
+    popEventQHead();
+    popReadyQHead();
+
+    insertIntoEventQ(preemptedProcArrival);
+}
+
+float getNextQuantumClockTime(){ return quantumClock + quantum; }
+
+float getNextQuantumAllocationTime()
+{
+    float nextQuantumTime = quantumClock;
+    while (nextQuantumTime < rq_head->p_link->arrivalTime)
+        nextQuantumTime += quantum;
+
+    return nextQuantumTime;
+}
+
 
 float getAvgTurnaround()
 {
@@ -426,13 +626,30 @@ float getAvgTurnaround()
 //        }
     }
 //    cout << "totalTurnaround: " << totalTurnaround << endl;
-    return totalTurnaround / MAX_PROCESSES;
+    return (totalTurnaround / MAX_PROCESSES);
+}
+
+float getTotalThroughput()
+{
+    procListNode *pl_cursor = pl_head;
+    float finTime = 0.0;
+    int count = 0;
+
+    while (pl_cursor->pl_next != NULL)
+    {
+        if (pl_cursor->finishTime == 0)
+            count++;
+        else
+            finTime = pl_cursor->finishTime;
+
+        pl_cursor = pl_cursor->pl_next;
+    }
+//    cout << "totalTime: " << finTime << endl;
+    return ((float)MAX_PROCESSES / finTime);
 }
 ///////////////////////////////////////////////////////////////
 int main(int argc, char *argv[] )
 {
-    clog << "hello\n";
-
     if (argc < 3)
     {
         show_usage();

@@ -11,7 +11,7 @@
 #include <list>
 
 using namespace std;
-#define MAX_PROCESSES 10000
+#define MAX_PROCESSES 100
 
 enum State {READY = 0, RUNNING = 1, TERMINATED = 3};
 enum Scheduler {_FCFS = 1, _SRTF = 2, _RR = 3};
@@ -95,6 +95,7 @@ float urand();
 float genexp(float);
 
 float getAvgTurnaround();
+float getTotalThroughput();
 
 void scheduleArrival();
 void scheduleDeparture();
@@ -102,6 +103,15 @@ void scheduleDispatch();
 void handleDispatch();
 void schedulePreemption();
 void handleArrival();
+
+void scheduleQuantumAllocation();
+void handleQuantumAllocation();
+void scheduleQuantumDeparture();
+void handleQuantumDeparture();
+void scheduleQuantumPreemption();
+void handleQuantumPreemption();
+float getNextQuantumAllocationTime();
+float getNextQuantumClockTime();
 
 // Initializations
 void insertIntoEventQ(eventQNode *);
