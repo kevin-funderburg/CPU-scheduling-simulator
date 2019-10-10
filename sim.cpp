@@ -443,7 +443,6 @@ void RR()
 
 void scheduleQuantumAllocation()
 {
-
     eventQNode *nuAllocation = new eventQNode;
 
     procListNode *nextProc;
@@ -477,9 +476,7 @@ void scheduleQuantumAllocation()
 
 void handleQuantumAllocation()
 {
-
     cpu_head->p_link = eq_head->p_link;
-
     cpu_head->busy = true;
 
     if (cpu_head->p_link->startTime == 0)
@@ -493,20 +490,15 @@ void handleQuantumAllocation()
 
 void scheduleQuantumDeparture()
 {
-
     eventQNode *nuDeparture = new eventQNode;
     nuDeparture->type = 2;
     nuDeparture->eq_next = 0;
     nuDeparture->p_link = cpu_head->p_link;
 
     if (cpu_head->p_link->reStartTime == 0)
-    {
         nuDeparture->time = cpu_head->p_link->startTime + cpu_head->p_link->remainingTime;
-    }
     else
-    {
         nuDeparture->time = cpu_head->p_link->reStartTime + cpu_head->p_link->remainingTime;
-    }
 
     insertIntoEventQ(nuDeparture);
 }
