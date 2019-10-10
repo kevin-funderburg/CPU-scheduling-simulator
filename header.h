@@ -15,7 +15,7 @@ using namespace std;
 
 enum State {READY = 0, RUNNING = 1, TERMINATED = 3};
 enum Scheduler {_FCFS = 1, _SRTF = 2, _RR = 3};
-enum EventType {ARRIVE = 1, DISPATCH = 2, DEPARTURE = 3};
+enum EventType {ARRIVE = 1, DISPATCH = 2, DEPARTURE = 3, PREEMPT = 4};
 
 struct procListNode
 {
@@ -96,6 +96,7 @@ float genexp(float);
 
 float getAvgTurnaround();
 float getTotalThroughput();
+float cpuEstFinishTime()
 
 void scheduleArrival();
 void scheduleDeparture();

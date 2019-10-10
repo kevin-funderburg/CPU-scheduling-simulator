@@ -423,21 +423,25 @@ void RR()
                 }
             }
         }
-
-        if (eq_head->type == 1)
-            handleArrival();
-        else if (eq_head->type == 2)
+        switch (eq_head->type)
         {
-            handleQuantumDeparture();
-            departureCount++;
+            case ARRIVE:
+                handleArrival();
+                break;
+            case DISPATCH:
+                handleQuantumAllocation();
+                break;
+            case DEPARTURE:
+                handleQuantumDeparture();
+                departureCount++;
 
-            if (rq_head != NULL && (rq_head->p_link->arrivalTime < cpu_head->clock))
-                scheduleQuantumAllocation();
+                if (rq_head != NULL && (rq_head->p_link->arrivalTime < cpu_head->clock))
+                    scheduleQuantumAllocation();
+                break;
+            case PREEMPT:
+                handleQuantumPreemption();
+            default: cerr << "invalid event type\n";
         }
-        else if (eq_head->type == 3)
-            handleQuantumAllocation();
-        else if (eq_head->type == 4)
-            handleQuantumPreemption();
     }
 }
 
@@ -516,10 +520,9 @@ void handleQuantumDeparture()
 
 void scheduleQuantumPreemption()
 {
-
-    eventQNode *nuPreemption = new eventQNode;
-    nuPreemption->type = 4;
-    nuPreemption->eq_next = 0;
+    eventQNode *preemption = new eventQNode;
+    preemption->type = 4;
+    preemption->eq_next = 0;
 
     cpu_head->clock = rq_head->p_link->arrivalTime;
 
@@ -529,11 +532,11 @@ void scheduleQuantumPreemption()
 
     quantumClock = nextQuantumTime;
 
-    nuPreemption->time = getNextQuantumClockTime();
+    preemption->time = getNextQuantumClockTime();
 
-    nuPreemption->p_link = rq_head->p_link;
+    preemption->p_link = rq_head->p_link;
 
-    insertIntoEventQ(nuPreemption);
+    insertIntoEventQ(preemption);
 }
 
 void handleQuantumPreemption()
@@ -578,6 +581,21 @@ float getNextQuantumAllocationTime()
         nextQuantumTime += quantum;
 
     return nextQuantumTime;
+}
+
+float cpuEstFinishTime()
+{
+    float estFinish;
+    float startTime = cpu_head->p_link->startTime;
+    float reStartTime = cpu_head->p_link->reStartTime;
+    float remainingTime = cpu_head->p_link->remainingTime;
+
+    if (reStartTime == 0)
+        estFinish = startTime + remainingTime;
+    else
+        estFinish = reStartTime + remainingTime;
+
+    return estFinish;
 }
 
 
