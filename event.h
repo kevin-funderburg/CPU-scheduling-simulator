@@ -13,7 +13,7 @@ struct event
     EventType type;
 
     struct event *eq_next;
-    struct procListNode *p_link;
+    struct process *p_link;
 };
 
 

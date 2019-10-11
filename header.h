@@ -15,10 +15,9 @@
 using namespace std;
 #define MAX_PROCESSES 10000
 
-enum State {READY = 0, RUNNING = 1, TERMINATED = 3};
 enum Scheduler {_FCFS = 1, _SRTF = 2, _RR = 3};
 
-struct procListNode
+struct process
 {
     int pid;
     float arrivalTime;
@@ -27,24 +26,56 @@ struct procListNode
     float finishTime;
     float burst;
     float remainingTime;
-    struct procListNode *pl_next;
+    struct process *pl_next;
 };
 
 struct CPU
 {
     float clock;
     bool busy;
-    struct procListNode *p_link;
+    struct process *p_link;
 };
 
-struct readyQNode
+struct Ready
 {
-    struct procListNode *p_link;
-    struct readyQNode *rq_next;
+    struct process *p_link;
+    struct Ready *rq_next;
 };
 
+class ReadyQueue
+{ public:
+    ReadyQueue() { rq_head = rq_tail = nullptr; }
+    Ready* top();
+    void pop();
+    void push(Ready *);
+    bool empty();
+private:
+    Ready* rq_head, *rq_tail;
+};
 
+Ready* ReadyQueue::top() { return rq_head; }
 
+void ReadyQueue::pop()
+{
+    Ready *tempPtr = rq_head;
+    rq_head = rq_head->rq_next;
+    delete tempPtr;
+}
+
+bool ReadyQueue::empty() { return rq_head == nullptr; }
+
+void ReadyQueue::push(Ready *newReady)
+{
+    if (rq_head == nullptr)  //empty queue
+        rq_head = newReady;
+    else
+    {
+        Ready *rq_cursor = rq_head;
+        while (rq_cursor->rq_next != nullptr)
+            rq_cursor = rq_cursor->rq_next;
+        rq_cursor->rq_next = newReady;
+    }
+}
 
 
 Scheduler scheduler;
@@ -54,18 +85,17 @@ float totalTurnaroundTime;
 float completionTime;
 float cpuBusyTime;
 float totalWaitingTime;
-
-int lambda;
-int lastid;
 float avgServiceTime = 0.0;
 float quantum;
 float quantumClock;
+int lambda;
 
 EventQueue eventQ;
+ReadyQueue readyQ;
 event *eq_head;
-procListNode *pl_head;
-procListNode *pl_tail;
-readyQNode *rq_head;
+process *pl_head;
+process *pl_tail;
+Ready *rq_head;
 CPU *cpu;
 
 /* Scheduling Algorithms */
@@ -83,14 +113,15 @@ float genexp(float);
 
 float cpuEstFinishTime();
 
-void scheduleArrival();
-void scheduleDeparture();
-void scheduleDispatch();
-void handleDispatch();
+void sched_arrival();
+void arrival();
+void sched_dispatch();
+void dispatch();
+void sched_depart();
+
 bool isPreemptive();
 void schedulePreemption();
 void handlePreemption();
-void handleArrival();
 
 void scheduleQuantumDispatch();
 void handleQuantumDispatch();
@@ -101,12 +132,10 @@ void handleQuantumPreemption();
 float getNextQuantumDispatchTime();
 float getNextQuantumClockTime();
 
-procListNode *getSRTProcess();
-procListNode *getHRRProcess();
-float getResponseRatioValue(procListNode *);
+process *getSRTProcess();
+process *getHRRProcess();
+float getResponseRatioValue(process *);
 
-//void insertIntoEventQ(event *);
-//void popEventQHead();
 void popReadyQHead();
 
 #endif //HEADER_H
