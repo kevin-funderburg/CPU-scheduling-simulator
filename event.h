@@ -5,7 +5,7 @@
 #ifndef EVENT_H
 #define EVENT_H
 
-enum EventType {ARRIVE = 1, DISPATCH = 2, DEPARTURE = 3};
+enum EventType {ARRIVE = 1, DISPATCH = 2, DEPARTURE = 3, PREEMPT = 4};
 
 struct event
 {

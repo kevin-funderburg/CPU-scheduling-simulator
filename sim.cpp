@@ -48,7 +48,6 @@ void init()
 {
     cout << "lambda: " << lambda << endl;
     quantumClock = 0.0;
-    lastid = 0;
 
     avgServiceTime = (float)1.0/avgServiceTime;
 
@@ -75,7 +74,7 @@ void init()
     eq_head->p_link = pl_head;
 
     eventQ = EventQueue();
-    eventQ.push(eventQ.top());
+    eventQ.push(eq_head);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -153,13 +152,6 @@ float genexp(float lambda)
 void scheduleArrival()
 {
     procListNode *pl_cursor = pl_tail;
-//    int count = 0;
-//    while (pl_cursor->pl_next != nullptr)
-//    {
-//        count++;
-//        pl_cursor = pl_cursor->pl_next;
-//    }
-
     pl_cursor->pl_next = new procListNode;
     pl_cursor->pl_next->pid = pl_cursor->pid + 1;
     pl_cursor->pl_next->arrivalTime = pl_cursor->arrivalTime + genexp((float)lambda);
@@ -177,7 +169,6 @@ void scheduleArrival()
     arrival->p_link = pl_cursor->pl_next;
     arrival->eq_next = nullptr;
 
-//    insertIntoEventQ(arrival);
     eventQ.push(arrival);
 }
 
@@ -187,8 +178,7 @@ void scheduleArrival()
 void handleArrival()
 {
     readyQNode *ready = new readyQNode;
-    ready->p_link = eventQ.top()->p_link;
-//    ready->p_link = eq_head->p_link;
+    ready->p_link = eventQ.top()->p_link;   //link process at head of event queue
     ready->rq_next = nullptr;
 
     if (rq_head == nullptr)  //empty queue
@@ -202,7 +192,6 @@ void handleArrival()
         rq_cursor->rq_next = ready;
     }
     eventQ.pop();
-//    popEventQHead();
 }
 
 /**
@@ -235,16 +224,14 @@ void scheduleDispatch()
     dispatch->p_link = nextProc;
 
     eventQ.push(dispatch);
-//    insertIntoEventQ(dispatch);
 }
 
 /**
- * Take a process off the ready queue and give to the CPU
- * for processing
+ * Take a process off the ready queue and give to the CPU for processing
  */
 void handleDispatch()
 {
-    //Link the process from event queue to the CPU
+    //Link the process at head of event queue to the CPU
     cpu->p_link = eventQ.top()->p_link;
 
     if (scheduler == _SRTF || scheduler == _RR)
@@ -269,10 +256,9 @@ void handleDispatch()
     }
 
     popReadyQHead();
-//    popEventQHead();
     eventQ.pop();
 
-    cpu->busy = true;    //CPU now busy executing process
+    cpu->busy = true;    //CPU now executing process
 
     //set clock to time of process arrival
     if (cpu->clock < cpu->p_link->arrivalTime)
@@ -308,19 +294,14 @@ void scheduleDeparture()
             departure->time = cpu->p_link->reStartTime + cpu->p_link->remainingTime;
     }
 
-//    insertIntoEventQ(departure);
     eventQ.push(departure);
 }
 
 void handleDeparture()
 {
-//    cpu->clock = eq_head->time;   //set clock to time of event at head of event queue
-    cpu->clock = eventQ.top()->time;   //set clock to time of event at head of event queue
-
+    cpu->clock = eventQ.top()->time;        //set clock to time of event at head of event queue
     cpu->p_link->finishTime = cpu->clock;   //set finish time of process to be departed to current time
-//    pl_head->finishTime = cpu->p_link->finishTime;
-
-    cpu->p_link->remainingTime = 0.0;    //clear remainingTime
+    cpu->p_link->remainingTime = 0.0;       //clear remainingTime
 
     cpuBusyTime += cpu->p_link->burst;
     totalTurnaroundTime += (cpu->p_link->finishTime - cpu->p_link->arrivalTime);
@@ -330,8 +311,6 @@ void handleDeparture()
     cpu->p_link = nullptr;
     cpu->busy = false;   //CPU ready for next process
 
-//    eq_head->pop();
-//    popEventQHead();    //remove departure event
     eventQ.pop();
 }
 
@@ -357,10 +336,7 @@ void schedulePreemption()
     preemption->eq_next = nullptr;
     preemption->p_link = eventQ.top()->p_link;
 
-//    popEventQHead();
     eventQ.pop();
-
-//    insertIntoEventQ(preemption);
     eventQ.push(preemption);
 }
 
