@@ -93,7 +93,7 @@ void generate_report()
     }
     ofstream data("sim.data",  ios::out | ios::app);    //output to text file for viewing
     ofstream xcel("sim.csv",  ios::out | ios::app);     //output to csv file for graphing in excel
-    if (data.is_open())
+    if (data.is_open() && xcel.is_open())
     {
         int w = 20;
         if (lambda == 1)
