@@ -375,7 +375,29 @@ void popReadyQHead()
 
 void SRTF()
 {
-    //TODO
+	/*
+	int arrivalCount = 0;
+	int dispatchCount = 0;
+	int preemptCount = 0;
+
+	while (dispatchCount < MAX_PROCESSES){
+		if (arrivalCount < (MAX_PROCESSES * 1.20)){
+			scheduleArrival();
+			arrivalCount++;
+		}
+
+		if (!cpu_head->busy){
+			if (rq_head != nullptr)
+			scheduleAllocation();
+		}
+		else
+		{
+			if (eq_head->type == 1){
+
+
+
+	*/
+		
 }
 
 
