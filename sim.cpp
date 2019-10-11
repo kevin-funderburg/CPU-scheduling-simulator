@@ -127,8 +127,6 @@ void generate_report()
     else cout << "Unable to open file";
 }
 
-int genID() { return ++lastid; }
-
 ////////////////////////////////////////////////////////////////
 /// @return a random number between 0 and 1
 float urand() { return( (float) rand()/RAND_MAX ); }
@@ -207,15 +205,17 @@ void scheduleDispatch()
     else if (scheduler == _SRTF)
     {
         if (cpu->clock > rq_head->p_link->arrivalTime)
+            //SRTF will traverse the process list to locate the
+            //process with the shortest remaining time
             nextProc = getSRTProcess();
         else
             nextProc = rq_head->p_link;
     }
-
     else if (scheduler == _RR)
         nextProc = getHRRProcess();
 
-    dispatch->time = cpu->clock < nextProc->arrivalTime ? nextProc->arrivalTime : cpu->clock;
+    dispatch->time = cpu->clock < nextProc->arrivalTime ?
+            nextProc->arrivalTime : cpu->clock;
 
     dispatch->type = DISPATCH;
     dispatch->eq_next = nullptr;
@@ -224,9 +224,14 @@ void scheduleDispatch()
     insertIntoEventQ(dispatch);
 }
 
+/*
+ * Take a process off the ready queue and give to the CPU
+ * for processing
+ */
 void handleDispatch()
 {
-    cpu->p_link = eq_head->p_link;  //assign process to CPU
+    //Link the process from event queue to the CPU
+    cpu->p_link = eq_head->p_link;
 
     if (scheduler == _SRTF || scheduler == _RR)
     {
@@ -264,21 +269,28 @@ void handleDispatch()
         cpu->p_link->reStartTime = cpu->clock;
 }
 
+/*
+ * Add a departure event to the event queue
+ */
 void scheduleDeparture()
 {
     eventQNode *departure = new eventQNode;
     departure->type = DEPARTURE;
     departure->eq_next = nullptr;
-    departure->p_link = cpu->p_link;
+    departure->p_link = cpu->p_link;    //link process on CPU to the departure event
 
     if (scheduler == _FCFS || scheduler == _RR)
-        departure->time = cpu->p_link->startTime + cpu->p_link->remainingTime;  //FCFS will process to completion
+        //FCFS will process to completion, so its departure time will
+        //be the completion time
+        departure->time = cpu->p_link->startTime + cpu->p_link->remainingTime;
 
     else if (scheduler == _SRTF)
     {
         if (cpu->p_link->reStartTime == 0)
+            //First time the process has been through the CPU
             departure->time = cpu->p_link->startTime + cpu->p_link->remainingTime;
         else
+            //Process has been preempted before so time must be calculated differently
             departure->time = cpu->p_link->reStartTime + cpu->p_link->remainingTime;
     }
 
@@ -287,9 +299,9 @@ void scheduleDeparture()
 
 void handleDeparture()
 {
-    cpu->clock = eq_head->time;   //set clock to head of event queue
+    cpu->clock = eq_head->time;   //set clock to time of event at head of event queue
 
-    cpu->p_link->finishTime = cpu->clock;    //log finishTime
+    cpu->p_link->finishTime = cpu->clock;   //set finish time of process to be departed to current time
 //    pl_head->finishTime = cpu->p_link->finishTime;
 
     cpu->p_link->remainingTime = 0.0;    //clear remainingTime
@@ -305,20 +317,31 @@ void handleDeparture()
     popEventQHead();    //remove departure event
 }
 
+/***
+ * Preemption will occur when the new event's time occurs BEFORE
+ * the cpu completes its execution, AND the remaining time of the
+ * event's process to complete is shorter than than the remaining time
+ * of the current process to complete
+ * */
 bool isPreemptive()
 {
     float cpuFinishTime = cpuEstFinishTime();
     float cpuRemainingTime = cpuFinishTime - eq_head->time;
 
-    if ((eq_head->time < cpuFinishTime) && (eq_head->p_link->remainingTime < cpuRemainingTime))
-        return true;
-    else
-        return false;
+    return (eq_head->time < cpuFinishTime) && (eq_head->p_link->remainingTime < cpuRemainingTime);
 }
 
 void schedulePreemption()
 {
-    //TODO
+    eventQNode *preemption = new eventQNode;
+    preemption->time = eq_head->time;
+    preemption->type = PREEMPT;
+    preemption->eq_next = nullptr;
+    preemption->p_link = eq_head->p_link;
+
+    popEventQHead();
+
+    insertIntoEventQ(preemption);
 }
 
 void handlePreemption()
@@ -431,20 +454,6 @@ void insertIntoEventQ(eventQNode *newEvent)
     }
 }
 
-void popEventQHead()
-{
-    eventQNode *tempPtr = eq_head;
-    eq_head = eq_head->eq_next;
-    delete tempPtr;
-}
-
-void popReadyQHead()
-{
-    readyQNode *tempPtr = rq_head;
-    rq_head = rq_head->rq_next;
-    delete tempPtr;
-}
-
 void SRTF()
 {
     int arrivalCount = 0;
@@ -453,6 +462,8 @@ void SRTF()
 
     while (departureCount < MAX_PROCESSES)
     {
+        cout << "arrivalCount: " << arrivalCount << endl;
+        cout << "departureCount: " << departureCount << endl;
         if (arrivalCount < (MAX_PROCESSES * 1.20))
         {
             scheduleArrival();
@@ -460,18 +471,23 @@ void SRTF()
         }
         if (!cpu->busy)
         {
-            if (rq_head != NULL)
+            if (rq_head != nullptr)
                 scheduleDispatch();
         }
         else
         {
             if (eq_head->type == ARRIVE)
             {
+                //If the current event's time occurs after the process
+                //currently on the CPU completes, it won't be preempted so it can
+                //be scheduled normally
                 if (eq_head->time > cpuEstFinishTime())
+                {
+                    cout << "estimated finish time: " << cpuEstFinishTime();
                     scheduleDeparture();
+                }
                 else if (isPreemptive())
                     schedulePreemption();
-
             }
         }
 
@@ -490,6 +506,7 @@ void SRTF()
                 break;
             case PREEMPT:
                 handlePreemption();
+                break;
             default: cerr << "invalid event type\n";
         }
 
@@ -699,6 +716,7 @@ float cpuEstFinishTime()
     return estFinish;
 }
 
+//Sub routine to locate the process with the shortest remaining time
 procListNode *getSRTProcess()
 {
     readyQNode *rq_cursor = rq_head;
@@ -713,6 +731,7 @@ procListNode *getSRTProcess()
         }
         rq_cursor = rq_cursor->rq_next;
     }
+    cout << "SRT process ID: " << srtProc->pid << endl;
     return srtProc;
 }
 
@@ -735,6 +754,19 @@ procListNode *getHRRProcess()
     return hrrProc;
 }
 
+void popEventQHead()
+{
+    eventQNode *tempPtr = eq_head;
+    eq_head = eq_head->eq_next;
+    delete tempPtr;
+}
+
+void popReadyQHead()
+{
+    readyQNode *tempPtr = rq_head;
+    rq_head = rq_head->rq_next;
+    delete tempPtr;
+}
 // HRRN Helper Function
 float getResponseRatioValue(procListNode *thisProc)
 {
