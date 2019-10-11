@@ -9,6 +9,7 @@
 
 #include <deque>
 #include <list>
+#include <queue>
 
 using namespace std;
 #define MAX_PROCESSES 10000
@@ -51,17 +52,23 @@ struct eventQNode
     struct procListNode *p_link;
 };
 
-
+struct eventComparator {
+    bool operator() (const eventQNode * left, const eventQNode * right) const {
+        return left->time > right->time;
+    }
+};
 ////////////////////////////////////////////////////////////////
 // Global variables
 //event* head; // head of event queue
-//priority_queue<event*,
-//        vector<event *, allocator<event*> >,
-//        eventComparator> eventQ;    ///< priority queue of events
+priority_queue<eventQNode*,
+        vector<eventQNode *, allocator<eventQNode*> >,
+        eventComparator> eventQ;    ///< priority queue of events
 //
+
 //deque<process> readyQ;
 //list <process> pList;
 //process p_table[MAX_PROCESSES + 200];
+
 
 Scheduler scheduler;
 
@@ -107,7 +114,9 @@ void scheduleArrival();
 void scheduleDeparture();
 void scheduleDispatch();
 void handleDispatch();
+bool isPreemptive();
 void schedulePreemption();
+void handlePreemption();
 void handleArrival();
 
 void scheduleQuantumDispatch();

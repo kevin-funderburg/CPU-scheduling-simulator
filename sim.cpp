@@ -28,7 +28,6 @@ void parseArgs(int argc, char *argv[])
     if (argc == 5) quantum = stof(argv[4]);
 }
 
-
 static void show_usage()
 {
     cerr << "Usage: sim [123] [average arrival rate] [average service time] [quantum interval]\n\n"
@@ -37,7 +36,6 @@ static void show_usage()
          << "\t2 : Shortest Remaining Time First (_SRTF)\n"
          << "\t3 : Round Robin, with different quantum values (_RR) (requires 4 arguments)\n";
 }
-
 
 void init()
 {
@@ -54,7 +52,7 @@ void init()
 
     pl_head = new procListNode;
     pl_head->pid = lastid;
-    pl_head->arrivalTime = genexp(avgArrivalTime);
+    pl_head->arrivalTime = genexp(lambda);
     pl_head->startTime = 0.0;
     pl_head->reStartTime = 0.0;
     pl_head->finishTime = 0.0;
@@ -69,7 +67,6 @@ void init()
     eq_head->eq_next = nullptr;
     eq_head->p_link = pl_head;
 }
-
 
 ////////////////////////////////////////////////////////////////
 void generate_report()
@@ -86,25 +83,29 @@ void generate_report()
         case _RR: _scheduler = "RR"; break;
     }
     ofstream data("sim.data",  ios::out | ios::app);
+    ofstream xcel("sim.csv",  ios::out | ios::app);
     if (data.is_open())
     {
         int w = 20;
-        if (lambda == 5)
+        if (lambda == 1)
         {
-            data << setfill('-') << setw(w * 5) << "\n"
+            data << setfill('-') << setw(w*5) << "\n"
                     << setfill(' ')
                     << setw(w/2) << "Scheduler"
                     << setw(w/2) << "lambda"
                     << setw(w) << "AvgTurnaround"
-                    << setw(w) <<"Throughput"
+                    << setw(w) << "Throughput"
                     << setw(w) << "CPU Utilization"
                     << setw(w) << "AvgReadyQ\n"
                     << setfill('-') << setw(w*5) << "\n";
-//            data << "---------------------------------------------------------------------------------------------------------------\n"
-//                 << "lambda\tAvgTurnaround\tThroughput\t\tCPU Utilization\t\tAvg Processes in RQ in RQ\n"
-//                 << "---------------------------------------------------------------------------------------------------------------\n";
+
+
+            xcel << "Scheduler,lambda,AvgTurnaround,Throughput,CPU Utilization,AvgReadyQ\n";
+//            data << "-------------------------------------------------------------------------------------------\n"
+//                 << "Scheduler\tlambda\tAvgTurnaround\tThroughput\t\tCPU Utilization\t\tAvgReadyQ\n"
+//                 << "-------------------------------------------------------------------------------------------\n";
         }
-//        data << lambda << "\t\t" << avgTurnaroundTime << "\t\t\t" << totalThroughput << "\t\t" << cpuUtil << "\t\t\t" << avgQlength << endl;
+//        data << _scheduler << "\t\t" << lambda << "\t\t" << avgTurnaroundTime << "\t\t\t" << totalThroughput << "\t\t" << cpuUtil << "\t\t\t" << avgQlength << endl;
         data << setfill(' ')
              << setw(w/2) << _scheduler
              << setw(w/2) << lambda
@@ -113,19 +114,24 @@ void generate_report()
              << setw(w) << cpuUtil
              << setw(w) << avgQlength << endl;
 
+        xcel << _scheduler << ","
+             << lambda << ","
+             << avgTurnaroundTime << ","
+             << totalThroughput << ","
+             << cpuUtil << ","
+             << avgQlength << ","
+             << endl;
+
         data.close();
     }
     else cout << "Unable to open file";
 }
 
-
 int genID() { return ++lastid; }
-
 
 ////////////////////////////////////////////////////////////////
 /// @return a random number between 0 and 1
 float urand() { return( (float) rand()/RAND_MAX ); }
-
 
 /////////////////////////////////////////////////////////////
 /// @return a random number that follows an exp distribution
@@ -141,7 +147,6 @@ float genexp(float lambda)
     return(x);
 }
 
-
 void scheduleArrival()
 {
     procListNode *pl_cursor = pl_tail;
@@ -151,7 +156,6 @@ void scheduleArrival()
         count++;
         pl_cursor = pl_cursor->pl_next;
     }
-//    cout << "list traversal: " << count << endl;
 
     pl_cursor->pl_next = new procListNode;
     pl_cursor->pl_next->pid = pl_cursor->pid + 1;
@@ -192,7 +196,6 @@ void handleArrival()
     }
     popEventQHead();
 }
-
 
 void scheduleDispatch()
 {
@@ -302,28 +305,60 @@ void handleDeparture()
     popEventQHead();    //remove departure event
 }
 
+bool isPreemptive()
+{
+    float cpuFinishTime = cpuEstFinishTime();
+    float cpuRemainingTime = cpuFinishTime - eq_head->time;
+
+    if ((eq_head->time < cpuFinishTime) && (eq_head->p_link->remainingTime < cpuRemainingTime))
+        return true;
+    else
+        return false;
+}
+
 void schedulePreemption()
 {
     //TODO
 }
 
+void handlePreemption()
+{
+    procListNode *preemptedProcPtr = cpu->p_link;
+
+    cpu->p_link->remainingTime =
+            cpuEstFinishTime() - eq_head->time;
+
+    cpu->p_link = eq_head->p_link;
+    cpu->clock = eq_head->time;
+    if (cpu->p_link->reStartTime == 0.0)
+        cpu->p_link->startTime = eq_head->time;
+    else
+        cpu->p_link->reStartTime = eq_head->time;
+
+    eventQNode *preemptedProcArrival = new eventQNode;
+    preemptedProcArrival->time = eq_head->time;
+    preemptedProcArrival->type = ARRIVE;
+    preemptedProcArrival->eq_next = nullptr;
+    preemptedProcArrival->p_link = preemptedProcPtr;
+
+    popEventQHead();
+
+    insertIntoEventQ(preemptedProcArrival);
+}
 
 ////////////////////////////////////////////////////////////
 int run_sim()
 {
+    cout << "Starting simulation with using scheduler: ";
     switch (scheduler)
     {
-        case _FCFS: cout << "Scheduling as FCFS\n\n"; FCFS();
-            break;
-        case _SRTF: cout << "Scheduling as SRTF\n\n"; SRTF();
-            break;
-        case _RR: cout << "Scheduling as RR\n\n"; RR();
-            break;
+        case _FCFS: cout << "FCFS\n\n"; FCFS(); break;
+        case _SRTF: cout << "SRTF\n\n"; SRTF(); break;
+        case _RR: cout << "RR\n\n"; RR(); break;
         default: cerr << "invalid scheduler\n"; return 1;
     }
     return 0;
 }
-
 
 void FCFS()
 {
@@ -355,8 +390,7 @@ void FCFS()
                 handleDeparture();
                 departureCount++;
                 break;
-            default:
-                cerr << "invalid event type\n";
+            default: cerr << "invalid event type\n";
         }
     }
     cout << "Arrival Count: " << arrivalCount << endl;
@@ -413,9 +447,57 @@ void popReadyQHead()
 
 void SRTF()
 {
-    //TODO
-}
+    int arrivalCount = 0;
+    int departureCount = 0;
+    int allocationCount = 0;
 
+    while (departureCount < MAX_PROCESSES)
+    {
+        if (arrivalCount < (MAX_PROCESSES * 1.20))
+        {
+            scheduleArrival();
+            arrivalCount++;
+        }
+        if (!cpu->busy)
+        {
+            if (rq_head != NULL)
+                scheduleDispatch();
+        }
+        else
+        {
+            if (eq_head->type == ARRIVE)
+            {
+                if (eq_head->time > cpuEstFinishTime())
+                    scheduleDeparture();
+                else if (isPreemptive())
+                    schedulePreemption();
+
+            }
+        }
+
+        switch (eq_head->type)
+        {
+            case ARRIVE:
+                handleArrival();
+                break;
+            case DISPATCH:
+                handleDispatch();
+                allocationCount++;
+                break;
+            case DEPARTURE:
+                handleDeparture();
+                departureCount++;
+                break;
+            case PREEMPT:
+                handlePreemption();
+            default: cerr << "invalid event type\n";
+        }
+
+    }
+    cout << "Arrival Count: " << arrivalCount << endl;
+    cout << "Departure Count: " << departureCount << endl;
+    cout << "Allocation Count: " << allocationCount << endl;
+}
 
 void RR()
 {
@@ -435,13 +517,18 @@ void RR()
         }
         else
         {
-            if (cpuEstFinishTime() < getNextQuantumClockTime())
+            float estCompletionTime = 0;
+            estCompletionTime = cpu->p_link->reStartTime == 0 ?
+                    cpu->p_link->remainingTime : cpu->p_link->startTime;
+
+//            nextQuantum
+            if (estCompletionTime < getNextQuantumClockTime())
                 scheduleQuantumDeparture();
             else
             {
                 if (rq_head != nullptr)
                 {
-                    if (rq_head->p_link->arrivalTime > cpuEstFinishTime())
+                    if (rq_head->p_link->arrivalTime > estCompletionTime)
                         scheduleQuantumDeparture();
                     else
                         scheduleQuantumPreemption();
@@ -492,8 +579,7 @@ void scheduleQuantumDispatch()
             dispatch->time = getNextQuantumDispatchTime();
         }
     }
-    else
-        cerr << "Error in scheduleQuantumDispatch()\n";
+    else cerr << "Error in scheduleQuantumDispatch()\n";
 
     dispatch->type = DISPATCH;
     dispatch->eq_next = nullptr;
@@ -507,10 +593,8 @@ void handleQuantumDispatch()
     cpu->p_link = eq_head->p_link;
     cpu->busy = true;
 
-    if (cpu->p_link->startTime == 0)
-        cpu->p_link->startTime;
-    else
-        cpu->p_link->reStartTime = eq_head->time;
+    cpu->p_link->startTime == 0 ?
+    cpu->p_link->startTime : cpu->p_link->reStartTime = eq_head->time;
 
     popReadyQHead();
     popEventQHead();
@@ -518,17 +602,17 @@ void handleQuantumDispatch()
 
 void scheduleQuantumDeparture()
 {
-    eventQNode *nuDeparture = new eventQNode;
-    nuDeparture->type = DEPARTURE;
-    nuDeparture->eq_next = nullptr;
-    nuDeparture->p_link = cpu->p_link;
+    eventQNode *departure = new eventQNode;
+    departure->type = DEPARTURE;
+    departure->eq_next = nullptr;
+    departure->p_link = cpu->p_link;
 
     if (cpu->p_link->reStartTime == 0)
-        nuDeparture->time = cpu->p_link->startTime + cpu->p_link->remainingTime;
+        departure->time = cpu->p_link->startTime + cpu->p_link->remainingTime;
     else
-        nuDeparture->time = cpu->p_link->reStartTime + cpu->p_link->remainingTime;
+        departure->time = cpu->p_link->reStartTime + cpu->p_link->remainingTime;
 
-    insertIntoEventQ(nuDeparture);
+    insertIntoEventQ(departure);
 }
 
 void handleQuantumDeparture()
