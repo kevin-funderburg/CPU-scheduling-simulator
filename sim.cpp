@@ -4,11 +4,7 @@
  * @authors: Kevin Funderburg, Rob Murray
  */
 
-/////////////////////////////////////////////////
-// NOTES
-// avgnumprocesses 1 / lambda * num_proceesses i think
-// Use 105 ms for the preemptive _SRTF
-/////////////////////////////////////////////////
+
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -19,10 +15,10 @@
 //#include "event.h"
 #include "header.h"
 using namespace std;
-/////////////////////////////////////////////////
+
 void parseArgs(int argc, char *argv[])
 {
-    scheduler = static_cast<Scheduler>(stoi(argv[1]));  // set scheduler
+    scheduler = static_cast<Scheduler>(stoi(argv[1]));
     lambda = atoi(argv[2]);
     avgServiceTime = (float)atof(argv[3]);
     if (argc == 5) quantum = (float)atof(argv[4]);
@@ -43,7 +39,7 @@ void init()
     quantumClock = 0.0;
     lastid = 0;
 
-    mu = (float)1.0/avgServiceTime;
+    avgServiceTime = (float)1.0/avgServiceTime;
 
     cpu = new CPU;
     cpu->clock = 0.0;
@@ -56,7 +52,7 @@ void init()
     pl_head->startTime = 0.0;
     pl_head->reStartTime = 0.0;
     pl_head->finishTime = 0.0;
-    pl_head->burst = genexp(mu);
+    pl_head->burst = genexp(avgServiceTime);
     pl_head->remainingTime = pl_head->burst;
     pl_head->pl_next = nullptr;
     pl_tail = pl_head;
@@ -161,7 +157,7 @@ void scheduleArrival()
     pl_cursor->pl_next->startTime = 0.0;
     pl_cursor->pl_next->reStartTime = 0.0;
     pl_cursor->pl_next->finishTime = 0.0;
-    pl_cursor->pl_next->burst = genexp(mu);
+    pl_cursor->pl_next->burst = genexp(avgServiceTime);
     pl_cursor->pl_next->remainingTime = pl_cursor->pl_next->burst;
     pl_cursor->pl_next->pl_next = nullptr;
     pl_tail = pl_tail->pl_next;
@@ -175,7 +171,9 @@ void scheduleArrival()
     insertIntoEventQ(arrival);
 }
 
-//Push process into ready queue and remove event from event queue
+/***
+ * Push process into ready queue and remove event from event queue
+ */
 void handleArrival()
 {
     readyQNode *ready = new readyQNode;
@@ -195,6 +193,9 @@ void handleArrival()
     popEventQHead();
 }
 
+/**
+ * Schedule a process to be attached to CPU for processing
+ */
 void scheduleDispatch()
 {
     eventQNode *dispatch = new eventQNode;
@@ -224,7 +225,7 @@ void scheduleDispatch()
     insertIntoEventQ(dispatch);
 }
 
-/*
+/**
  * Take a process off the ready queue and give to the CPU
  * for processing
  */
@@ -269,7 +270,7 @@ void handleDispatch()
         cpu->p_link->reStartTime = cpu->clock;
 }
 
-/*
+/**
  * Add a departure event to the event queue
  */
 void scheduleDeparture()
@@ -462,8 +463,8 @@ void SRTF()
 
     while (departureCount < MAX_PROCESSES)
     {
-        cout << "arrivalCount: " << arrivalCount << endl;
-        cout << "departureCount: " << departureCount << endl;
+//        cout << "arrivalCount: " << arrivalCount << endl;
+//        cout << "departureCount: " << departureCount << endl;
         if (arrivalCount < (MAX_PROCESSES * 1.20))
         {
             scheduleArrival();
@@ -482,10 +483,7 @@ void SRTF()
                 //currently on the CPU completes, it won't be preempted so it can
                 //be scheduled normally
                 if (eq_head->time > cpuEstFinishTime())
-                {
-                    cout << "estimated finish time: " << cpuEstFinishTime();
                     scheduleDeparture();
-                }
                 else if (isPreemptive())
                     schedulePreemption();
             }
@@ -568,9 +566,12 @@ void RR()
                 break;
             case PREEMPT:
                 handleQuantumPreemption();
+                break;
             default: cerr << "invalid event type\n";
         }
     }
+    cout << "Arrival Count: " << arrivalCount << endl;
+    cout << "Departure Count: " << departureCount << endl;
 }
 
 void scheduleQuantumDispatch()
@@ -636,9 +637,16 @@ void handleQuantumDeparture()
 {
     cpu->p_link->finishTime = eq_head->time;
     cpu->p_link->remainingTime = 0.0;
-    cpu->p_link = nullptr;
     cpu->clock = eq_head->time;
     cpu->busy = false;
+
+    cpuBusyTime += cpu->p_link->burst;
+    totalTurnaroundTime += (cpu->p_link->finishTime - cpu->p_link->arrivalTime);
+    completionTime = cpu->p_link->finishTime;
+    totalWaitingTime += (cpu->p_link->finishTime - cpu->p_link->arrivalTime - cpu->p_link->burst);
+
+    cpu->p_link = nullptr;
+
 
     popEventQHead();
 }
@@ -731,7 +739,6 @@ procListNode *getSRTProcess()
         }
         rq_cursor = rq_cursor->rq_next;
     }
-    cout << "SRT process ID: " << srtProc->pid << endl;
     return srtProc;
 }
 
