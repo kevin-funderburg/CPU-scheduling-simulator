@@ -49,7 +49,7 @@ class ReadyQueue
     void pop();
     void push(Ready *);
     bool empty();
-private:
+    process *getSRTProcess();
     Ready* rq_head, *rq_tail;
 };
 
@@ -77,6 +77,22 @@ void ReadyQueue::push(Ready *newReady)
     }
 }
 
+process* ReadyQueue::getSRTProcess()
+{
+    Ready *rq_cursor = rq_head;
+    process *srtProc = rq_cursor->p_link;
+    float srt = rq_cursor->p_link->remainingTime;
+    while (rq_cursor != nullptr)
+    {
+        if (rq_cursor->p_link->remainingTime < srt)
+        {
+            srt = rq_cursor->p_link->remainingTime;
+            srtProc = rq_cursor->p_link;
+        }
+        rq_cursor = rq_cursor->rq_next;
+    }
+    return srtProc;
+}
 
 Scheduler scheduler;
 

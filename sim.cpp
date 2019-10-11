@@ -70,6 +70,7 @@ void init()
     eq_head->eq_next = nullptr;
     eq_head->p_link = pl_head;
 
+    readyQ = ReadyQueue();
     eventQ = EventQueue();
     eventQ.push(eq_head);
 }
@@ -200,15 +201,15 @@ void sched_dispatch()
 
     process *nextProc;
     if (scheduler == _FCFS)
-        nextProc = rq_head->p_link;
+        nextProc = readyQ.top()->p_link;
     else if (scheduler == _SRTF)
     {
-        if (cpu->clock > rq_head->p_link->arrivalTime)
+        if (cpu->clock > readyQ.top()->p_link->arrivalTime)
             //SRTF will traverse the process list to locate the
             //process with the shortest remaining time
-            nextProc = getSRTProcess();
+            nextProc = readyQ.getSRTProcess();
         else
-            nextProc = rq_head->p_link;
+            nextProc = readyQ.top()->p_link;
     }
     else if (scheduler == _RR)
         nextProc = getHRRProcess();
@@ -233,8 +234,8 @@ void dispatch()
 
     if (scheduler == _SRTF || scheduler == _RR)
     {
-        Ready *rq_cursor = rq_head->rq_next;
-        Ready *rq_precursor = rq_head;
+        Ready *rq_cursor = readyQ.top()->rq_next;
+        Ready *rq_precursor = readyQ.top();
         if (rq_precursor->p_link->arrivalTime != eventQ.top()->p_link->arrivalTime)
         {
             while (rq_cursor != nullptr)
@@ -242,8 +243,8 @@ void dispatch()
                 if (rq_cursor->p_link->arrivalTime == eventQ.top()->p_link->arrivalTime)
                 {
                     rq_precursor->rq_next = rq_cursor->rq_next;
-                    rq_cursor->rq_next = rq_head;
-                    rq_head = rq_cursor;
+                    rq_cursor->rq_next = readyQ.top();
+                    readyQ.rq_head = rq_cursor;
                     break;
                 }
                 rq_cursor = rq_cursor->rq_next;
@@ -252,7 +253,8 @@ void dispatch()
         }
     }
 
-    popReadyQHead();
+    readyQ.pop();
+//    popReadyQHead();
     eventQ.pop();
 
     cpu->busy = true;    //CPU now executing process
@@ -388,7 +390,7 @@ void FCFS()
         if (!cpu->busy)
         {
             sched_arrival();
-            if (rq_head != nullptr) sched_dispatch();
+            if (readyQ.top() != nullptr) sched_dispatch();
         }
         else
             sched_depart();
@@ -428,7 +430,7 @@ void SRTF()
         }
         if (!cpu->busy)
         {
-            if (rq_head != nullptr) sched_dispatch();
+            if (readyQ.top() != nullptr) sched_dispatch();
         }
         else
         {
@@ -480,7 +482,7 @@ void RR()
         if (!cpu->busy)
         {
             sched_arrival();
-            if (rq_head != nullptr) scheduleQuantumDispatch();
+            if (readyQ.top() != nullptr) scheduleQuantumDispatch();
         }
         else
         {
@@ -492,9 +494,9 @@ void RR()
                 scheduleQuantumDeparture();
             else
             {
-                if (rq_head != nullptr)
+                if (readyQ.top() != nullptr)
                 {
-                    if (rq_head->p_link->arrivalTime > estCompletionTime)
+                    if (readyQ.top()->p_link->arrivalTime > estCompletionTime)
                         scheduleQuantumDeparture();
                     else
                         scheduleQuantumPreemption();
@@ -512,7 +514,7 @@ void RR()
             case DEPARTURE:
                 handleQuantumDeparture();
                 departureCount++;
-                if (rq_head != nullptr && (rq_head->p_link->arrivalTime < cpu->clock))
+                if (readyQ.top() != nullptr && (readyQ.top()->p_link->arrivalTime < cpu->clock))
                     scheduleQuantumDispatch();
                 break;
             case PREEMPT:
@@ -527,15 +529,15 @@ void scheduleQuantumDispatch()
 {
     event *dispatch = new event;
     process *nextProc;
-    nextProc = rq_head->p_link;
+    nextProc = readyQ.top()->p_link;
 
-    if (rq_head != nullptr)
+    if (readyQ.top() != nullptr)
     {
-        if (rq_head->p_link->arrivalTime < cpu->clock)
+        if (readyQ.top()->p_link->arrivalTime < cpu->clock)
             dispatch->time = cpu->clock;
         else
         {
-            cpu->clock = rq_head->p_link->arrivalTime;
+            cpu->clock = readyQ.top()->p_link->arrivalTime;
 
             float nextQuantumTime = quantumClock;
             while (nextQuantumTime < cpu->clock)
@@ -565,7 +567,8 @@ void handleQuantumDispatch()
     else
         cpu->p_link->reStartTime = eventQ.top()->time;
 
-    popReadyQHead();
+    readyQ.pop();
+//    popReadyQHead();
 //    popEventQHead();
     eventQ.pop();
 
@@ -611,7 +614,7 @@ void scheduleQuantumPreemption()
     preemption->type = PREEMPT;
     preemption->eq_next = nullptr;
 
-    cpu->clock = rq_head->p_link->arrivalTime;
+    cpu->clock = readyQ.top()->p_link->arrivalTime;
 
     float nextQuantumTime = quantumClock;
     while (nextQuantumTime < cpu->clock)
@@ -621,7 +624,7 @@ void scheduleQuantumPreemption()
 
     preemption->time = getNextQuantumClockTime();
 
-    preemption->p_link = rq_head->p_link;
+    preemption->p_link = readyQ.top()->p_link;
 
 //    insertIntoEventQ(preemption);
     eventQ.push(preemption);
@@ -653,7 +656,8 @@ void handleQuantumPreemption()
 
 //    popEventQHead();
     eventQ.pop();
-    popReadyQHead();
+    readyQ.pop();
+//    popReadyQHead();
 
 //    insertIntoEventQ(preemptedProcArrival);
     eventQ.push(preemptedProcArrival);
@@ -665,7 +669,7 @@ float getNextQuantumClockTime(){ return quantumClock + quantum; }
 float getNextQuantumDispatchTime()
 {
     float nextQuantumTime = quantumClock;
-    while (nextQuantumTime < rq_head->p_link->arrivalTime)
+    while (nextQuantumTime < readyQ.top()->p_link->arrivalTime)
         nextQuantumTime += quantum;
 
     return nextQuantumTime;
@@ -684,26 +688,26 @@ float cpuEstFinishTime()
 }
 
 //Sub routine to locate the process with the shortest remaining time
-process *getSRTProcess()
-{
-    Ready *rq_cursor = rq_head;
-    process *srtProc = rq_cursor->p_link;
-    float srt = rq_cursor->p_link->remainingTime;
-    while (rq_cursor != nullptr)
-    {
-        if (rq_cursor->p_link->remainingTime < srt)
-        {
-            srt = rq_cursor->p_link->remainingTime;
-            srtProc = rq_cursor->p_link;
-        }
-        rq_cursor = rq_cursor->rq_next;
-    }
-    return srtProc;
-}
+//process *getSRTProcess()
+//{
+//    Ready *rq_cursor = readyQ.top();
+//    process *srtProc = rq_cursor->p_link;
+//    float srt = rq_cursor->p_link->remainingTime;
+//    while (rq_cursor != nullptr)
+//    {
+//        if (rq_cursor->p_link->remainingTime < srt)
+//        {
+//            srt = rq_cursor->p_link->remainingTime;
+//            srtProc = rq_cursor->p_link;
+//        }
+//        rq_cursor = rq_cursor->rq_next;
+//    }
+//    return srtProc;
+//}
 
 process *getHRRProcess()
 {
-    Ready *rq_cursor = rq_head;
+    Ready *rq_cursor = readyQ.top();
     process *hrrProc = rq_cursor->p_link;
     float hrr = getResponseRatioValue(hrrProc);
 
@@ -720,19 +724,7 @@ process *getHRRProcess()
     return hrrProc;
 }
 
-//void popEventQHead()
-//{
-//    event *tempPtr = eventQ.top();
-//    eventQ.top() = eventQ.top()->eq_next;
-//    delete tempPtr;
-//}
 
-void popReadyQHead()
-{
-    Ready *tempPtr = rq_head;
-    rq_head = rq_head->rq_next;
-    delete tempPtr;
-}
 // HRRN Helper Function
 float getResponseRatioValue(process *thisProc)
 {
