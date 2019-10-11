@@ -10,7 +10,6 @@
 #include <fstream>
 #include <cstdlib>
 #include <cmath>
-//#include "event.h"
 #include "header.h"
 using namespace std;
 
@@ -178,16 +177,6 @@ void arrival()
     Ready *ready = new Ready;
     ready->p_link = eventQ.top()->p_link;   //link process at head of event queue
     ready->rq_next = nullptr;
-
-//    if (rq_head == nullptr)  //empty queue
-//        rq_head = ready;
-//    else
-//    {
-//        Ready *rq_cursor = rq_head;
-//        while (rq_cursor->rq_next != nullptr)
-//            rq_cursor = rq_cursor->rq_next;
-//        rq_cursor->rq_next = ready;
-//    }
     readyQ.push(ready);
     eventQ.pop();
 }
@@ -357,10 +346,8 @@ void handlePreemption()
     preemptedProcArrival->eq_next = nullptr;
     preemptedProcArrival->p_link = preemptedProcPtr;
 
-//    popEventQHead();
     eventQ.pop();
     eventQ.push(preemptedProcArrival);
-//    insertIntoEventQ(preemptedProcArrival);
 }
 
 ////////////////////////////////////////////////////////////
@@ -566,8 +553,6 @@ void q_dispatch()
         cpu->p_link->reStartTime = eventQ.top()->time;
 
     readyQ.pop();
-//    popReadyQHead();
-//    popEventQHead();
     eventQ.pop();
 
 }
@@ -584,7 +569,6 @@ void sched_q_depart()
     else
         departure->time = cpu->p_link->reStartTime + cpu->p_link->remainingTime;
 
-//    insertIntoEventQ(departure);
     eventQ.push(departure);
 }
 
@@ -602,7 +586,6 @@ void q_depart()
 
     cpu->p_link = nullptr;
 
-//    popEventQHead();
     eventQ.pop();
 }
 
@@ -619,14 +602,9 @@ void sched_q_preempt()
         nextQuantumTime += quantum;
 
     quantumClock = nextQuantumTime;
-
     preemption->time = get_next_q_clock();
-
     preemption->p_link = readyQ.top()->p_link;
-
-//    insertIntoEventQ(preemption);
     eventQ.push(preemption);
-
 }
 
 void q_preempt()
@@ -681,70 +659,6 @@ float cpuEstFinishTime()
     return estFinish;
 }
 
-
-
-
-
-
-
-
-/*
-float getAvgTurnaround()
-{
-    float totalTurnaround = 0.0,
-            avgTurnaround = 0.0;
-
-    if (pl_head == nullptr)  //empty queue
-        cerr << "empty queue";
-    else
-    {
-        process *pl_cursor = pl_head;
-        while (pl_cursor->finishTime != 0)
-        {
-
-//                float tmp = pl_cursor->finishTime - pl_cursor->arrivalTime;
-//                cout << pl_cursor->pid << ": " << "pl_cursor->finishTime - pl_cursor->arrivalTime: "
-//                    << pl_cursor->finishTime << " - " << pl_cursor->arrivalTime << " = " << tmp << endl;
-                totalTurnaround += (pl_cursor->finishTime - pl_cursor->arrivalTime);
-                //            cout << "totalTurnaround: " << totalTurnaround << endl;
-
-
-            pl_cursor = pl_cursor->pl_next;
-        }
-//        while (pl_cursor->pl_next != nullptr)
-//        {
-//            if (pl_cursor->finishTime != 0)
-//            {
-////                float tmp = pl_cursor->finishTime - pl_cursor->arrivalTime;
-////                cout << pl_cursor->pid << ": " << "pl_cursor->finishTime - pl_cursor->arrivalTime: "
-////                    << pl_cursor->finishTime << " - " << pl_cursor->arrivalTime << " = " << tmp << endl;
-//                totalTurnaround += (pl_cursor->finishTime - pl_cursor->arrivalTime);
-//                //            cout << "totalTurnaround: " << totalTurnaround << endl;
-//
-//            }
-//            pl_cursor = pl_cursor->pl_next;
-//        }
-    }
-//    cout << "totalTurnaround: " << totalTurnaround << endl;
-    return (totalTurnaround / MAX_PROCESSES);
-}
-
-float getTotalThroughput()
-{
-    process *pl_cursor = pl_head;
-    float finTime = 0.0;
-    int count = 0;
-
-    while (pl_cursor->pl_next != nullptr)
-    {
-        pl_cursor->finishTime == 0 ? (count++) : (finTime = pl_cursor->finishTime);
-
-        pl_cursor = pl_cursor->pl_next;
-    }
-//    cout << "totalTime: " << finTime << endl;
-    return ((float)MAX_PROCESSES / finTime);
-}
- */
 ///////////////////////////////////////////////////////////////
 int main(int argc, char *argv[] )
 {
