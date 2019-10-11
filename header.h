@@ -52,6 +52,60 @@ struct eventQNode
     struct procListNode *p_link;
 };
 
+
+class Queue
+{ public:
+    Queue() {eq_head = NULL;}	// if front is NULL, the queue is empty, whatever the value of rear may be
+    eventQNode* top();
+    void pop();
+    void push(eventQNode *);
+
+private:
+    eventQNode* eq_head, *eq_tail;
+};
+
+eventQNode* Queue::top()
+{
+    return eq_head;
+}
+void Queue::pop()
+{
+    eventQNode *tempPtr = eq_head;
+    eq_head = eq_head->eq_next;
+    delete tempPtr;
+}
+
+void Queue::push(eventQNode *newEvent)
+{
+    if (eq_head == nullptr)  //empty list
+        eq_head = newEvent;
+    else if (eq_head->time > newEvent->time)   //add to front
+    {
+        newEvent->eq_next = eq_head;
+        eq_head = newEvent;
+    }
+    else
+    {
+        eventQNode *eq_cursor = eq_head;
+        while (eq_cursor != nullptr)
+        {
+            if ((eq_cursor->time < newEvent->time) && (eq_cursor->eq_next == nullptr))  //add to tail
+            {
+                eq_cursor->eq_next = newEvent;
+                break;
+            }
+            else if ((eq_cursor->time < newEvent->time) && (eq_cursor->eq_next->time > newEvent->time))   //add inside
+            {
+                newEvent->eq_next = eq_cursor->eq_next;
+                eq_cursor->eq_next = newEvent;
+                break;
+            }
+            else
+                eq_cursor = eq_cursor->eq_next;
+        }
+    }
+}
+
 struct eventComparator {
     bool operator() (const eventQNode * left, const eventQNode * right) const {
         return left->time > right->time;
@@ -60,14 +114,14 @@ struct eventComparator {
 ////////////////////////////////////////////////////////////////
 // Global variables
 //event* head; // head of event queue
-priority_queue<eventQNode*,
-        vector<eventQNode *, allocator<eventQNode*> >,
-        eventComparator> eventQ;    ///< priority queue of events
+//priority_queue<eventQNode*,
+//        vector<eventQNode *, allocator<eventQNode*> >,
+//        eventComparator> eventQ;    ///< priority queue of events
+////
 //
-
-//deque<process> readyQ;
-//list <process> pList;
-//process p_table[MAX_PROCESSES + 200];
+////deque<process> readyQ;
+////list <process> pList;
+////process p_table[MAX_PROCESSES + 200];
 
 
 Scheduler scheduler;
@@ -78,28 +132,25 @@ float completionTime;
 float cpuBusyTime;
 float totalWaitingTime;
 
-float avgArrivalTime;
 int lambda;
 int lastid;
 float avgServiceTime = 0.0;
 float quantum;
-//float mu = 0.0;
 float quantumClock;
+Queue eventQ;
 eventQNode *eq_head;
 procListNode *pl_head;
 procListNode *pl_tail;
 readyQNode *rq_head;
 CPU *cpu;
-int countSomething = 0;
-///////////////////////////////////////////////////////////////
 
 /* Scheduling Algorithms */
 void FCFS();
 void SRTF();
 void RR();
 
-// function definitions
-void parseArgs(char *[]);
+void parseArgs(int, char *[]);
+static void show_usage();
 void init();
 int run_sim();
 void generate_report();
@@ -131,7 +182,7 @@ float getNextQuantumClockTime();
 procListNode *getSRTProcess();
 procListNode *getHRRProcess();
 float getResponseRatioValue(procListNode *);
-// Initializations
+
 void insertIntoEventQ(eventQNode *);
 void popEventQHead();
 void popReadyQHead();
