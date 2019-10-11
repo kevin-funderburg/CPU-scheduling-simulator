@@ -168,6 +168,7 @@ void scheduleArrival()
     arrival->p_link = pl_cursor->pl_next;
     arrival->eq_next = nullptr;
 
+    eventQ.push(arrival);
     insertIntoEventQ(arrival);
 }
 
@@ -190,6 +191,7 @@ void handleArrival()
 
         rq_cursor->rq_next = ready;
     }
+    eventQ.pop();
     popEventQHead();
 }
 
@@ -257,6 +259,7 @@ void handleDispatch()
 
     popReadyQHead();
     popEventQHead();
+    eventQ.pop();
 
     cpu->busy = true;    //CPU now busy executing process
 
@@ -280,9 +283,8 @@ void scheduleDeparture()
     departure->eq_next = nullptr;
     departure->p_link = cpu->p_link;    //link process on CPU to the departure event
 
+    //FCFS will process to completion, so its departure time will be the completion time
     if (scheduler == _FCFS || scheduler == _RR)
-        //FCFS will process to completion, so its departure time will
-        //be the completion time
         departure->time = cpu->p_link->startTime + cpu->p_link->remainingTime;
 
     else if (scheduler == _SRTF)
@@ -296,6 +298,7 @@ void scheduleDeparture()
     }
 
     insertIntoEventQ(departure);
+    eventQ.push(departure);
 }
 
 void handleDeparture()
@@ -316,6 +319,7 @@ void handleDeparture()
     cpu->busy = false;   //CPU ready for next process
 
     popEventQHead();    //remove departure event
+    eventQ.pop();
 }
 
 /***
@@ -341,8 +345,10 @@ void schedulePreemption()
     preemption->p_link = eq_head->p_link;
 
     popEventQHead();
+    eventQ.pop();
 
     insertIntoEventQ(preemption);
+    eventQ.push(preemption);
 }
 
 void handlePreemption()
@@ -366,6 +372,7 @@ void handlePreemption()
     preemptedProcArrival->p_link = preemptedProcPtr;
 
     popEventQHead();
+    eventQ.pop();
 
     insertIntoEventQ(preemptedProcArrival);
 }
@@ -472,8 +479,7 @@ void SRTF()
         }
         if (!cpu->busy)
         {
-            if (rq_head != nullptr)
-                scheduleDispatch();
+            if (rq_head != nullptr) scheduleDispatch();
         }
         else
         {
@@ -604,6 +610,7 @@ void scheduleQuantumDispatch()
     dispatch->p_link = nextProc;
 
     insertIntoEventQ(dispatch);
+    eventQ.push(dispatch);
 }
 
 void handleQuantumDispatch()
@@ -618,6 +625,8 @@ void handleQuantumDispatch()
 
     popReadyQHead();
     popEventQHead();
+    eventQ.pop();
+
 }
 
 void scheduleQuantumDeparture()
@@ -633,6 +642,7 @@ void scheduleQuantumDeparture()
         departure->time = cpu->p_link->reStartTime + cpu->p_link->remainingTime;
 
     insertIntoEventQ(departure);
+    eventQ.push(departure);
 }
 
 void handleQuantumDeparture()
@@ -650,6 +660,7 @@ void handleQuantumDeparture()
     cpu->p_link = nullptr;
 
     popEventQHead();
+    eventQ.pop();
 }
 
 void scheduleQuantumPreemption()
@@ -671,6 +682,8 @@ void scheduleQuantumPreemption()
     preemption->p_link = rq_head->p_link;
 
     insertIntoEventQ(preemption);
+    eventQ.push(preemption);
+
 }
 
 void handleQuantumPreemption()
@@ -698,8 +711,11 @@ void handleQuantumPreemption()
 
     popEventQHead();
     popReadyQHead();
+    eventQ.pop();
 
     insertIntoEventQ(preemptedProcArrival);
+    eventQ.push(preemptedProcArrival);
+
 }
 
 float getNextQuantumClockTime(){ return quantumClock + quantum; }
