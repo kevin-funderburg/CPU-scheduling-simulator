@@ -23,9 +23,9 @@ using namespace std;
 void parseArgs(int argc, char *argv[])
 {
     scheduler = static_cast<Scheduler>(stoi(argv[1]));  // set scheduler
-    lambda = stoi(argv[2]);
-    avgServiceTime = stof(argv[3]);
-    if (argc == 5) quantum = stof(argv[4]);
+    lambda = atoi(argv[2]);
+    avgServiceTime = (float)atof(argv[3]);
+    if (argc == 5) quantum = (float)atof(argv[4]);
 }
 
 static void show_usage()
@@ -43,7 +43,7 @@ void init()
     quantumClock = 0.0;
     lastid = 0;
 
-    avgArrivalTime = 1.0/(float)lambda;
+    mu = 1.0/(float)lambda;
 
     cpu = new CPU;
     cpu->clock = 0.0;
@@ -52,11 +52,11 @@ void init()
 
     pl_head = new procListNode;
     pl_head->pid = lastid;
-    pl_head->arrivalTime = genexp(lambda);
+    pl_head->arrivalTime = genexp((float)lambda);
     pl_head->startTime = 0.0;
     pl_head->reStartTime = 0.0;
     pl_head->finishTime = 0.0;
-    pl_head->burst = genexp(avgServiceTime);
+    pl_head->burst = genexp(mu);
     pl_head->remainingTime = pl_head->burst;
     pl_head->pl_next = nullptr;
     pl_tail = pl_head;
@@ -129,7 +129,7 @@ void generate_report()
 
 ////////////////////////////////////////////////////////////////
 /// @return a random number between 0 and 1
-float urand() { return( (float) rand()/RAND_MAX ); }
+float urand() { return (float) rand() / RAND_MAX; }
 
 /////////////////////////////////////////////////////////////
 /// @return a random number that follows an exp distribution
@@ -157,11 +157,11 @@ void scheduleArrival()
 
     pl_cursor->pl_next = new procListNode;
     pl_cursor->pl_next->pid = pl_cursor->pid + 1;
-    pl_cursor->pl_next->arrivalTime = pl_cursor->arrivalTime + genexp(avgArrivalTime);
+    pl_cursor->pl_next->arrivalTime = pl_cursor->arrivalTime + genexp((float)lambda);
     pl_cursor->pl_next->startTime = 0.0;
     pl_cursor->pl_next->reStartTime = 0.0;
     pl_cursor->pl_next->finishTime = 0.0;
-    pl_cursor->pl_next->burst = genexp(avgServiceTime);
+    pl_cursor->pl_next->burst = genexp(mu);
     pl_cursor->pl_next->remainingTime = pl_cursor->pl_next->burst;
     pl_cursor->pl_next->pl_next = nullptr;
     pl_tail = pl_tail->pl_next;
