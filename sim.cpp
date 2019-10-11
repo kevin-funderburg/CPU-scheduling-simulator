@@ -43,7 +43,7 @@ void init()
     quantumClock = 0.0;
     lastid = 0;
 
-    mu = 1.0/(float)lambda;
+    mu = (float)1.0/avgServiceTime;
 
     cpu = new CPU;
     cpu->clock = 0.0;
