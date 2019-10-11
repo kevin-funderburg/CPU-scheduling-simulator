@@ -11,7 +11,7 @@
 #include <list>
 
 using namespace std;
-#define MAX_PROCESSES 100
+#define MAX_PROCESSES 10000
 
 enum State {READY = 0, RUNNING = 1, TERMINATED = 3};
 enum Scheduler {_FCFS = 1, _SRTF = 2, _RR = 3};
@@ -29,7 +29,7 @@ struct procListNode
     struct procListNode *pl_next;
 };
 
-struct cpuNode
+struct CPU
 {
     float clock;
     bool busy;
@@ -66,9 +66,13 @@ struct eventQNode
 Scheduler scheduler;
 
 // Global Variables
+float totalTurnaroundTime;
+float completionTime;
+float cpuBusyTime;
+float totalWaitingTime;
+
 float avgArrivalTime;
 int lambda;
-//float lambda;
 int lastid;
 float avgServiceTime;
 float quantum;
@@ -76,8 +80,9 @@ float mu = 0.0;
 float quantumClock;
 eventQNode *eq_head;
 procListNode *pl_head;
+procListNode *pl_tail;
 readyQNode *rq_head;
-cpuNode *cpu_head;
+CPU *cpu;
 int countSomething = 0;
 ///////////////////////////////////////////////////////////////
 

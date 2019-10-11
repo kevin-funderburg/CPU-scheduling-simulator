@@ -24,10 +24,8 @@ void parseArgs(int argc, char *argv[])
 {
     scheduler = static_cast<Scheduler>(stoi(argv[1]));  // set scheduler
     lambda = stoi(argv[2]);
-//    lambda = (float)1.0 / stof(argv[2]);
     avgServiceTime = stof(argv[3]);
-    if (argc == 5)
-        float quantum = stof(argv[4]);
+    if (argc == 5) quantum = stof(argv[4]);
 }
 
 
@@ -43,15 +41,16 @@ static void show_usage()
 
 void init()
 {
+    cout << "lambda: " << lambda << endl;
     quantumClock = 0.0;
     lastid = 0;
 
     avgArrivalTime = 1.0/(float)lambda;
 
-    cpu_head = new cpuNode;
-    cpu_head->clock = 0.0;
-    cpu_head->busy = false;
-    cpu_head->p_link = nullptr;
+    cpu = new CPU;
+    cpu->clock = 0.0;
+    cpu->busy = false;
+    cpu->p_link = nullptr;
 
     pl_head = new procListNode;
     pl_head->pid = lastid;
@@ -62,6 +61,7 @@ void init()
     pl_head->burst = genexp(avgServiceTime);
     pl_head->remainingTime = pl_head->burst;
     pl_head->pl_next = nullptr;
+    pl_tail = pl_head;
 
     eq_head = new eventQNode;
     eq_head->time = pl_head->arrivalTime;
@@ -74,16 +74,44 @@ void init()
 ////////////////////////////////////////////////////////////////
 void generate_report()
 {
+    float avgTurnaroundTime = totalTurnaroundTime / MAX_PROCESSES;
+    float totalThroughput = MAX_PROCESSES / completionTime;
+    float cpuUtil = cpuBusyTime / completionTime;
+    float avgWaitingTime = totalWaitingTime / MAX_PROCESSES;
+    float avgQlength = 1.0/(float)lambda * avgWaitingTime;
+    string _scheduler;
+    switch (scheduler) {
+        case _FCFS: _scheduler = "FCFS"; break;
+        case _SRTF: _scheduler = "SRTF"; break;
+        case _RR: _scheduler = "RR"; break;
+    }
     ofstream data("sim.data",  ios::out | ios::app);
     if (data.is_open())
     {
-        if (lambda == 1)
+        int w = 20;
+        if (lambda == 5)
         {
-            data << "---------------------------------------------------------------------------------------------------------------\n"
-                 << "lambda\tAvgTurnaround\tThroughput\n"
-                 << "---------------------------------------------------------------------------------------------------------------\n";
+            data << setfill('-') << setw(w * 5) << "\n"
+                    << setfill(' ')
+                    << setw(w/2) << "Scheduler"
+                    << setw(w/2) << "lambda"
+                    << setw(w) << "AvgTurnaround"
+                    << setw(w) <<"Throughput"
+                    << setw(w) << "CPU Utilization"
+                    << setw(w) << "AvgReadyQ\n"
+                    << setfill('-') << setw(w*5) << "\n";
+//            data << "---------------------------------------------------------------------------------------------------------------\n"
+//                 << "lambda\tAvgTurnaround\tThroughput\t\tCPU Utilization\t\tAvg Processes in RQ in RQ\n"
+//                 << "---------------------------------------------------------------------------------------------------------------\n";
         }
-        data << lambda << "\t\t" << getAvgTurnaround() << "\t\t\t" << getTotalThroughput() << endl;
+//        data << lambda << "\t\t" << avgTurnaroundTime << "\t\t\t" << totalThroughput << "\t\t" << cpuUtil << "\t\t\t" << avgQlength << endl;
+        data << setfill(' ')
+             << setw(w/2) << _scheduler
+             << setw(w/2) << lambda
+             << setw(w) << avgTurnaroundTime
+             << setw(w) << totalThroughput
+             << setw(w) << cpuUtil
+             << setw(w) << avgQlength << endl;
 
         data.close();
     }
@@ -116,9 +144,14 @@ float genexp(float lambda)
 
 void scheduleArrival()
 {
-    procListNode *pl_cursor = pl_head;
+    procListNode *pl_cursor = pl_tail;
+    int count = 0;
     while (pl_cursor->pl_next != nullptr)
+    {
+        count++;
         pl_cursor = pl_cursor->pl_next;
+    }
+//    cout << "list traversal: " << count << endl;
 
     pl_cursor->pl_next = new procListNode;
     pl_cursor->pl_next->pid = pl_cursor->pid + 1;
@@ -129,6 +162,7 @@ void scheduleArrival()
     pl_cursor->pl_next->burst = genexp(avgServiceTime);
     pl_cursor->pl_next->remainingTime = pl_cursor->pl_next->burst;
     pl_cursor->pl_next->pl_next = nullptr;
+    pl_tail = pl_tail->pl_next;
 
     eventQNode *arrival = new eventQNode;
     arrival->time = pl_cursor->pl_next->arrivalTime;
@@ -156,7 +190,6 @@ void handleArrival()
 
         rq_cursor->rq_next = ready;
     }
-
     popEventQHead();
 }
 
@@ -170,7 +203,7 @@ void scheduleDispatch()
         nextProc = rq_head->p_link;
     else if (scheduler == _SRTF)
     {
-        if (cpu_head->clock > rq_head->p_link->arrivalTime)
+        if (cpu->clock > rq_head->p_link->arrivalTime)
             nextProc = getSRTProcess();
         else
             nextProc = rq_head->p_link;
@@ -179,7 +212,7 @@ void scheduleDispatch()
     else if (scheduler == _RR)
         nextProc = getHRRProcess();
 
-    dispatch->time = cpu_head->clock < nextProc->arrivalTime ? nextProc->arrivalTime : cpu_head->clock;
+    dispatch->time = cpu->clock < nextProc->arrivalTime ? nextProc->arrivalTime : cpu->clock;
 
     dispatch->type = DISPATCH;
     dispatch->eq_next = nullptr;
@@ -190,7 +223,7 @@ void scheduleDispatch()
 
 void handleDispatch()
 {
-    cpu_head->p_link = eq_head->p_link;  //assign process to CPU
+    cpu->p_link = eq_head->p_link;  //assign process to CPU
 
     if (scheduler == _SRTF || scheduler == _RR)
     {
@@ -216,16 +249,16 @@ void handleDispatch()
     popReadyQHead();
     popEventQHead();
 
-    cpu_head->busy = true;    //CPU now busy executing process
+    cpu->busy = true;    //CPU now busy executing process
 
     //set clock to time of process arrival
-    if (cpu_head->clock < cpu_head->p_link->arrivalTime)
-        cpu_head->clock = cpu_head->p_link->arrivalTime;
+    if (cpu->clock < cpu->p_link->arrivalTime)
+        cpu->clock = cpu->p_link->arrivalTime;
 
-    if (cpu_head->p_link->startTime == 0)
-        cpu_head->p_link->startTime = cpu_head->clock;
+    if (cpu->p_link->startTime == 0)
+        cpu->p_link->startTime = cpu->clock;
     else
-        cpu_head->p_link->reStartTime = cpu_head->clock;
+        cpu->p_link->reStartTime = cpu->clock;
 }
 
 void scheduleDeparture()
@@ -233,17 +266,17 @@ void scheduleDeparture()
     eventQNode *departure = new eventQNode;
     departure->type = DEPARTURE;
     departure->eq_next = nullptr;
-    departure->p_link = cpu_head->p_link;
+    departure->p_link = cpu->p_link;
 
     if (scheduler == _FCFS || scheduler == _RR)
-        departure->time = cpu_head->p_link->startTime + cpu_head->p_link->remainingTime;  //FCFS will process to completion
+        departure->time = cpu->p_link->startTime + cpu->p_link->remainingTime;  //FCFS will process to completion
 
     else if (scheduler == _SRTF)
     {
-        if (cpu_head->p_link->reStartTime == 0)
-            departure->time = cpu_head->p_link->startTime + cpu_head->p_link->remainingTime;
+        if (cpu->p_link->reStartTime == 0)
+            departure->time = cpu->p_link->startTime + cpu->p_link->remainingTime;
         else
-            departure->time = cpu_head->p_link->reStartTime + cpu_head->p_link->remainingTime;
+            departure->time = cpu->p_link->reStartTime + cpu->p_link->remainingTime;
     }
 
     insertIntoEventQ(departure);
@@ -251,15 +284,20 @@ void scheduleDeparture()
 
 void handleDeparture()
 {
-    cpu_head->clock = eq_head->time;   //set clock to head of event queue
+    cpu->clock = eq_head->time;   //set clock to head of event queue
 
-    cpu_head->p_link->finishTime = cpu_head->clock;    //log finishTime
-    pl_head->finishTime = cpu_head->p_link->finishTime;
+    cpu->p_link->finishTime = cpu->clock;    //log finishTime
+//    pl_head->finishTime = cpu->p_link->finishTime;
 
-    cpu_head->p_link->remainingTime = 0.0;    //clear remainingTime
-    cpu_head->p_link = nullptr;
+    cpu->p_link->remainingTime = 0.0;    //clear remainingTime
 
-    cpu_head->busy = false;   //CPU ready for next process
+    cpuBusyTime += cpu->p_link->burst;
+    totalTurnaroundTime += (cpu->p_link->finishTime - cpu->p_link->arrivalTime);
+    completionTime = cpu->p_link->finishTime;
+    totalWaitingTime += (cpu->p_link->finishTime - cpu->p_link->arrivalTime - cpu->p_link->burst);
+
+    cpu->p_link = nullptr;
+    cpu->busy = false;   //CPU ready for next process
 
     popEventQHead();    //remove departure event
 }
@@ -295,7 +333,7 @@ void FCFS()
 
     while (departureCount < MAX_PROCESSES)
     {
-        if (!cpu_head->busy)
+        if (!cpu->busy)
         {
             scheduleArrival();
             if (rq_head != nullptr) scheduleDispatch();
@@ -390,7 +428,7 @@ void RR()
             scheduleArrival();
             arrivalCount++;
         }
-        if (!cpu_head->busy)
+        if (!cpu->busy)
         {
             scheduleArrival();
             if (rq_head != nullptr) scheduleQuantumDispatch();
@@ -421,7 +459,7 @@ void RR()
             case DEPARTURE:
                 handleQuantumDeparture();
                 departureCount++;
-                if (rq_head != nullptr && (rq_head->p_link->arrivalTime < cpu_head->clock))
+                if (rq_head != nullptr && (rq_head->p_link->arrivalTime < cpu->clock))
                     scheduleQuantumDispatch();
                 break;
             case PREEMPT:
@@ -440,14 +478,14 @@ void scheduleQuantumDispatch()
 
     if (rq_head != nullptr)
     {
-        if (rq_head->p_link->arrivalTime < cpu_head->clock)
-            dispatch->time = cpu_head->clock;
+        if (rq_head->p_link->arrivalTime < cpu->clock)
+            dispatch->time = cpu->clock;
         else
         {
-            cpu_head->clock = rq_head->p_link->arrivalTime;
+            cpu->clock = rq_head->p_link->arrivalTime;
 
             float nextQuantumTime = quantumClock;
-            while (nextQuantumTime < cpu_head->clock)
+            while (nextQuantumTime < cpu->clock)
                 nextQuantumTime += quantum;
             quantumClock = nextQuantumTime;
 
@@ -466,13 +504,13 @@ void scheduleQuantumDispatch()
 
 void handleQuantumDispatch()
 {
-    cpu_head->p_link = eq_head->p_link;
-    cpu_head->busy = true;
+    cpu->p_link = eq_head->p_link;
+    cpu->busy = true;
 
-    if (cpu_head->p_link->startTime == 0)
-        cpu_head->p_link->startTime;
+    if (cpu->p_link->startTime == 0)
+        cpu->p_link->startTime;
     else
-        cpu_head->p_link->reStartTime = eq_head->time;
+        cpu->p_link->reStartTime = eq_head->time;
 
     popReadyQHead();
     popEventQHead();
@@ -483,23 +521,23 @@ void scheduleQuantumDeparture()
     eventQNode *nuDeparture = new eventQNode;
     nuDeparture->type = DEPARTURE;
     nuDeparture->eq_next = nullptr;
-    nuDeparture->p_link = cpu_head->p_link;
+    nuDeparture->p_link = cpu->p_link;
 
-    if (cpu_head->p_link->reStartTime == 0)
-        nuDeparture->time = cpu_head->p_link->startTime + cpu_head->p_link->remainingTime;
+    if (cpu->p_link->reStartTime == 0)
+        nuDeparture->time = cpu->p_link->startTime + cpu->p_link->remainingTime;
     else
-        nuDeparture->time = cpu_head->p_link->reStartTime + cpu_head->p_link->remainingTime;
+        nuDeparture->time = cpu->p_link->reStartTime + cpu->p_link->remainingTime;
 
     insertIntoEventQ(nuDeparture);
 }
 
 void handleQuantumDeparture()
 {
-    cpu_head->p_link->finishTime = eq_head->time;
-    cpu_head->p_link->remainingTime = 0.0;
-    cpu_head->p_link = nullptr;
-    cpu_head->clock = eq_head->time;
-    cpu_head->busy = false;
+    cpu->p_link->finishTime = eq_head->time;
+    cpu->p_link->remainingTime = 0.0;
+    cpu->p_link = nullptr;
+    cpu->clock = eq_head->time;
+    cpu->busy = false;
 
     popEventQHead();
 }
@@ -510,10 +548,10 @@ void scheduleQuantumPreemption()
     preemption->type = PREEMPT;
     preemption->eq_next = nullptr;
 
-    cpu_head->clock = rq_head->p_link->arrivalTime;
+    cpu->clock = rq_head->p_link->arrivalTime;
 
     float nextQuantumTime = quantumClock;
-    while (nextQuantumTime < cpu_head->clock)
+    while (nextQuantumTime < cpu->clock)
         nextQuantumTime += quantum;
 
     quantumClock = nextQuantumTime;
@@ -527,14 +565,14 @@ void scheduleQuantumPreemption()
 
 void handleQuantumPreemption()
 {
-    procListNode *preemptedProcPtr = cpu_head->p_link;
+    procListNode *preemptedProcPtr = cpu->p_link;
 
-    cpu_head->p_link->remainingTime = cpuEstFinishTime() - eq_head->time;
+    cpu->p_link->remainingTime = cpuEstFinishTime() - eq_head->time;
 
-    cpu_head->p_link = eq_head->p_link;
-    cpu_head->clock = eq_head->time;
+    cpu->p_link = eq_head->p_link;
+    cpu->clock = eq_head->time;
 
-    cpu_head->p_link->startTime == 0.0 ? cpu_head->p_link->startTime : cpu_head->p_link->reStartTime = eq_head->time;
+    cpu->p_link->startTime == 0.0 ? cpu->p_link->startTime : cpu->p_link->reStartTime = eq_head->time;
 
     float nextQuantumTime = quantumClock;
     while (nextQuantumTime < eq_head->time)
@@ -568,9 +606,9 @@ float getNextQuantumDispatchTime()
 float cpuEstFinishTime()
 {
     float estFinish;
-    float startTime = cpu_head->p_link->startTime;
-    float reStartTime = cpu_head->p_link->reStartTime;
-    float remainingTime = cpu_head->p_link->remainingTime;
+    float startTime = cpu->p_link->startTime;
+    float reStartTime = cpu->p_link->reStartTime;
+    float remainingTime = cpu->p_link->remainingTime;
 
     estFinish = (reStartTime == 0 ? startTime : reStartTime) + remainingTime;
 
@@ -616,11 +654,11 @@ procListNode *getHRRProcess()
 // HRRN Helper Function
 float getResponseRatioValue(procListNode *thisProc)
 {
-    float HRR = ((cpu_head->clock - thisProc->arrivalTime) + thisProc->burst) / thisProc->burst;
+    float HRR = ((cpu->clock - thisProc->arrivalTime) + thisProc->burst) / thisProc->burst;
     return HRR;
 }
 
-
+/*
 float getAvgTurnaround()
 {
     float totalTurnaround = 0.0,
@@ -676,6 +714,7 @@ float getTotalThroughput()
 //    cout << "totalTime: " << finTime << endl;
     return ((float)MAX_PROCESSES / finTime);
 }
+ */
 ///////////////////////////////////////////////////////////////
 int main(int argc, char *argv[] )
 {
