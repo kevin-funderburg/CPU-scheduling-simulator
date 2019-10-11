@@ -611,8 +611,10 @@ void handleQuantumDispatch()
     cpu->p_link = eq_head->p_link;
     cpu->busy = true;
 
-    cpu->p_link->startTime == 0 ?
-    cpu->p_link->startTime : cpu->p_link->reStartTime = eq_head->time;
+    if (cpu->p_link->startTime == 0)
+        cpu->p_link->startTime = eq_head->time;
+    else
+        cpu->p_link->reStartTime = eq_head->time;
 
     popReadyQHead();
     popEventQHead();
@@ -646,7 +648,6 @@ void handleQuantumDeparture()
     totalWaitingTime += (cpu->p_link->finishTime - cpu->p_link->arrivalTime - cpu->p_link->burst);
 
     cpu->p_link = nullptr;
-
 
     popEventQHead();
 }
