@@ -7,9 +7,6 @@
 #ifndef HEADER_H
 #define HEADER_H
 
-//#include <deque>
-//#include <list>
-//#include <queue>
 #include "event.h"
 
 using namespace std;
@@ -29,12 +26,30 @@ struct process
     struct process *pl_next;
 };
 
-struct CPU
-{
+class CPU
+{ public:
+    CPU() {
+        clock = 0.0;
+        busy = false;
+        p_link = nullptr;
+    };
     float clock;
     bool busy;
     struct process *p_link;
+    float get_est_finish_time();
 };
+
+float CPU::get_est_finish_time()
+{
+    float est_finish;
+    float startTime = p_link->startTime;
+    float reStartTime = p_link->reStartTime;
+    float remainingTime = p_link->remainingTime;
+
+    est_finish = (reStartTime == 0 ? startTime : reStartTime) + remainingTime;
+
+    return est_finish;
+}
 
 struct Ready
 {
@@ -49,7 +64,7 @@ class ReadyQueue
     void pop();
     void push(Ready *);
     bool empty();
-    process *getSRTProcess();
+    process *get_srt();
     Ready* rq_head, *rq_tail;
 };
 
@@ -77,7 +92,7 @@ void ReadyQueue::push(Ready *newReady)
     }
 }
 
-process* ReadyQueue::getSRTProcess()
+process* ReadyQueue::get_srt()
 {
     Ready *rq_cursor = rq_head;
     process *srtProc = rq_cursor->p_link;
@@ -93,6 +108,8 @@ process* ReadyQueue::getSRTProcess()
     }
     return srtProc;
 }
+
+
 
 Scheduler scheduler;
 
@@ -112,7 +129,7 @@ event *eq_head;
 process *pl_head;
 process *pl_tail;
 Ready *rq_head;
-CPU *cpu;
+CPU cpu;
 
 /* Scheduling Algorithms */
 void FCFS();
@@ -135,22 +152,20 @@ void sched_dispatch();
 void dispatch();
 void sched_depart();
 
-bool isPreemptive();
-void schedulePreemption();
-void handlePreemption();
+bool does_preempt();
+void sched_preempt();
+void preempt();
 
-void scheduleQuantumDispatch();
-void handleQuantumDispatch();
-void scheduleQuantumDeparture();
-void handleQuantumDeparture();
-void scheduleQuantumPreemption();
-void handleQuantumPreemption();
-float getNextQuantumDispatchTime();
-float getNextQuantumClockTime();
+void sched_q_dispatch();
+void q_dispatch();
+void sched_q_depart();
+void q_depart();
+void sched_q_preempt();
+void q_preempt();
+float get_next_q_dispatch();
+float get_next_q_clock();
 
-process *getSRTProcess();
-process *getHRRProcess();
-float getResponseRatioValue(process *);
+//process *getSRTProcess();
 
 void popReadyQHead();
 

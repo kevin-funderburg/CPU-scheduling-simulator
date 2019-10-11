@@ -48,10 +48,12 @@ void init()
     quantumClock = 0.0;
     avgServiceTime = (float)1.0/avgServiceTime;
 
-    cpu = new CPU;
-    cpu->clock = 0.0;
-    cpu->busy = false;
-    cpu->p_link = nullptr;
+//    cpu = new CPU;
+//    cpu->clock = 0.0;
+//    cpu->busy = false;
+//    cpu->p_link = nullptr;
+
+    cpu = CPU();
 
     pl_head = new process;
     pl_head->pid = 0;
@@ -198,7 +200,6 @@ void arrival()
 void sched_dispatch()
 {
     event *dispatch = new event;
-
     process *nextProc;
     if (scheduler == _FCFS)
         nextProc = readyQ.top()->p_link;
@@ -207,12 +208,12 @@ void sched_dispatch()
         if (cpu->clock > readyQ.top()->p_link->arrivalTime)
             //SRTF will traverse the process list to locate the
             //process with the shortest remaining time
-            nextProc = readyQ.getSRTProcess();
+            nextProc = readyQ.get_srt();
         else
             nextProc = readyQ.top()->p_link;
     }
-    else if (scheduler == _RR)
-        nextProc = getHRRProcess();
+//    else if (scheduler == _RR)
+//        nextProc = getHRRProcess();
 
     dispatch->time = cpu->clock < nextProc->arrivalTime ?
             nextProc->arrivalTime : cpu->clock;
@@ -254,7 +255,6 @@ void dispatch()
     }
 
     readyQ.pop();
-//    popReadyQHead();
     eventQ.pop();
 
     cpu->busy = true;    //CPU now executing process
@@ -319,7 +319,7 @@ void handleDeparture()
  * event's process to complete is shorter than than the remaining time
  * of the current process to complete
  * */
-bool isPreemptive()
+bool does_preempt()
 {
     float cpuFinishTime = cpuEstFinishTime();
     float cpuRemainingTime = cpuFinishTime - eventQ.top()->time;
@@ -327,7 +327,7 @@ bool isPreemptive()
     return (eventQ.top()->time < cpuFinishTime) && (eventQ.top()->p_link->remainingTime < cpuRemainingTime);
 }
 
-void schedulePreemption()
+void sched_preempt()
 {
     event *preemption = new event;
     preemption->time = eventQ.top()->time;
@@ -441,8 +441,8 @@ void SRTF()
                 //be scheduled normally
                 if (eventQ.top()->time > cpuEstFinishTime())
                     sched_depart();
-                else if (isPreemptive())
-                    schedulePreemption();
+                else if (does_preempt())
+                    sched_preempt();
             }
         }
 
@@ -482,7 +482,7 @@ void RR()
         if (!cpu->busy)
         {
             sched_arrival();
-            if (readyQ.top() != nullptr) scheduleQuantumDispatch();
+            if (readyQ.top() != nullptr) sched_q_dispatch();
         }
         else
         {
@@ -490,16 +490,16 @@ void RR()
             estCompletionTime = cpu->p_link->reStartTime == 0 ?
                     cpu->p_link->remainingTime : cpu->p_link->startTime;
 
-            if (estCompletionTime < getNextQuantumClockTime())
-                scheduleQuantumDeparture();
+            if (estCompletionTime < get_next_q_clock())
+                sched_q_depart();
             else
             {
                 if (readyQ.top() != nullptr)
                 {
                     if (readyQ.top()->p_link->arrivalTime > estCompletionTime)
-                        scheduleQuantumDeparture();
+                        sched_q_depart();
                     else
-                        scheduleQuantumPreemption();
+                        sched_q_preempt();
                 }
             }
         }
@@ -509,23 +509,23 @@ void RR()
                 arrival();
                 break;
             case DISPATCH:
-                handleQuantumDispatch();
+                q_dispatch();
                 break;
             case DEPARTURE:
-                handleQuantumDeparture();
+                q_depart();
                 departureCount++;
                 if (readyQ.top() != nullptr && (readyQ.top()->p_link->arrivalTime < cpu->clock))
-                    scheduleQuantumDispatch();
+                    sched_q_dispatch();
                 break;
             case PREEMPT:
-                handleQuantumPreemption();
+                q_preempt();
                 break;
             default: cerr << "invalid event type\n";
         }
     }
     }
 
-void scheduleQuantumDispatch()
+void sched_q_dispatch()
 {
     event *dispatch = new event;
     process *nextProc;
@@ -544,10 +544,10 @@ void scheduleQuantumDispatch()
                 nextQuantumTime += quantum;
             quantumClock = nextQuantumTime;
 
-            dispatch->time = getNextQuantumDispatchTime();
+            dispatch->time = get_next_q_dispatch();
         }
     }
-    else cerr << "Error in scheduleQuantumDispatch()\n";
+    else cerr << "Error in sched_q_dispatch()\n";
 
     dispatch->type = DISPATCH;
     dispatch->eq_next = nullptr;
@@ -557,7 +557,7 @@ void scheduleQuantumDispatch()
     eventQ.push(dispatch);
 }
 
-void handleQuantumDispatch()
+void q_dispatch()
 {
     cpu->p_link = eventQ.top()->p_link;
     cpu->busy = true;
@@ -574,7 +574,7 @@ void handleQuantumDispatch()
 
 }
 
-void scheduleQuantumDeparture()
+void sched_q_depart()
 {
     event *departure = new event;
     departure->type = DEPARTURE;
@@ -590,7 +590,7 @@ void scheduleQuantumDeparture()
     eventQ.push(departure);
 }
 
-void handleQuantumDeparture()
+void q_depart()
 {
     cpu->p_link->finishTime = eventQ.top()->time;
     cpu->p_link->remainingTime = 0.0;
@@ -608,7 +608,7 @@ void handleQuantumDeparture()
     eventQ.pop();
 }
 
-void scheduleQuantumPreemption()
+void sched_q_preempt()
 {
     event *preemption = new event;
     preemption->type = PREEMPT;
@@ -622,7 +622,7 @@ void scheduleQuantumPreemption()
 
     quantumClock = nextQuantumTime;
 
-    preemption->time = getNextQuantumClockTime();
+    preemption->time = get_next_q_clock();
 
     preemption->p_link = readyQ.top()->p_link;
 
@@ -631,9 +631,9 @@ void scheduleQuantumPreemption()
 
 }
 
-void handleQuantumPreemption()
+void q_preempt()
 {
-    process *preemptedProcPtr = cpu->p_link;
+    process *preemp_pr = cpu->p_link;
 
     cpu->p_link->remainingTime = cpuEstFinishTime() - eventQ.top()->time;
 
@@ -652,21 +652,17 @@ void handleQuantumPreemption()
     preemptedProcArrival->time = eventQ.top()->time;
     preemptedProcArrival->type = ARRIVE;
     preemptedProcArrival->eq_next = nullptr;
-    preemptedProcArrival->p_link = preemptedProcPtr;
+    preemptedProcArrival->p_link = preemp_pr;
 
-//    popEventQHead();
     eventQ.pop();
     readyQ.pop();
-//    popReadyQHead();
-
-//    insertIntoEventQ(preemptedProcArrival);
     eventQ.push(preemptedProcArrival);
 
 }
 
-float getNextQuantumClockTime(){ return quantumClock + quantum; }
+float get_next_q_clock(){ return quantumClock + quantum; }
 
-float getNextQuantumDispatchTime()
+float get_next_q_dispatch()
 {
     float nextQuantumTime = quantumClock;
     while (nextQuantumTime < readyQ.top()->p_link->arrivalTime)
@@ -687,50 +683,12 @@ float cpuEstFinishTime()
     return estFinish;
 }
 
-//Sub routine to locate the process with the shortest remaining time
-//process *getSRTProcess()
-//{
-//    Ready *rq_cursor = readyQ.top();
-//    process *srtProc = rq_cursor->p_link;
-//    float srt = rq_cursor->p_link->remainingTime;
-//    while (rq_cursor != nullptr)
-//    {
-//        if (rq_cursor->p_link->remainingTime < srt)
-//        {
-//            srt = rq_cursor->p_link->remainingTime;
-//            srtProc = rq_cursor->p_link;
-//        }
-//        rq_cursor = rq_cursor->rq_next;
-//    }
-//    return srtProc;
-//}
-
-process *getHRRProcess()
-{
-    Ready *rq_cursor = readyQ.top();
-    process *hrrProc = rq_cursor->p_link;
-    float hrr = getResponseRatioValue(hrrProc);
-
-    while (rq_cursor != nullptr)
-    {
-        if (getResponseRatioValue(rq_cursor->p_link) > hrr)
-        {
-            hrr = getResponseRatioValue(rq_cursor->p_link);
-            hrrProc = rq_cursor->p_link;
-        }
-        rq_cursor = rq_cursor->rq_next;
-    }
-
-    return hrrProc;
-}
 
 
-// HRRN Helper Function
-float getResponseRatioValue(process *thisProc)
-{
-    float HRR = ((cpu->clock - thisProc->arrivalTime) + thisProc->burst) / thisProc->burst;
-    return HRR;
-}
+
+
+
+
 
 /*
 float getAvgTurnaround()
