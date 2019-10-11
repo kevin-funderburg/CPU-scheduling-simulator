@@ -48,12 +48,10 @@ void init()
     quantumClock = 0.0;
     avgServiceTime = (float)1.0/avgServiceTime;
 
-//    cpu = new CPU;
-//    cpu->clock = 0.0;
-//    cpu->busy = false;
-//    cpu->p_link = nullptr;
-
-    cpu = CPU();
+    cpu = new CPU;
+    cpu->clock = 0.0;
+    cpu->busy = false;
+    cpu->p_link = nullptr;
 
     pl_head = new process;
     pl_head->pid = 0;
@@ -653,7 +651,7 @@ void q_preempt()
     preemptedProcArrival->type = ARRIVE;
     preemptedProcArrival->eq_next = nullptr;
     preemptedProcArrival->p_link = preemp_pr;
-
+    
     eventQ.pop();
     readyQ.pop();
     eventQ.push(preemptedProcArrival);

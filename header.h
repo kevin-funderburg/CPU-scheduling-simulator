@@ -26,30 +26,37 @@ struct process
     struct process *pl_next;
 };
 
-class CPU
-{ public:
-    CPU() {
-        clock = 0.0;
-        busy = false;
-        p_link = nullptr;
-    };
+struct CPU
+{
     float clock;
     bool busy;
     struct process *p_link;
-    float get_est_finish_time();
 };
 
-float CPU::get_est_finish_time()
-{
-    float est_finish;
-    float startTime = p_link->startTime;
-    float reStartTime = p_link->reStartTime;
-    float remainingTime = p_link->remainingTime;
+//class CPU
+//{ public:
+//    CPU() {
+//        clock = 0.0;
+//        busy = false;
+//        p_link = nullptr;
+//    };
+//    float clock;
+//    bool busy;
+//    struct process *p_link;
+//    float get_est_finish_time();
+//};
 
-    est_finish = (reStartTime == 0 ? startTime : reStartTime) + remainingTime;
-
-    return est_finish;
-}
+//float CPU::get_est_finish_time()
+//{
+//    float est_finish;
+//    float startTime = p_link->startTime;
+//    float reStartTime = p_link->reStartTime;
+//    float remainingTime = p_link->remainingTime;
+//
+//    est_finish = (reStartTime == 0 ? startTime : reStartTime) + remainingTime;
+//
+//    return est_finish;
+//}
 
 struct Ready
 {
@@ -129,7 +136,7 @@ event *eq_head;
 process *pl_head;
 process *pl_tail;
 Ready *rq_head;
-CPU cpu;
+CPU *cpu;
 
 /* Scheduling Algorithms */
 void FCFS();
