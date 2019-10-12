@@ -303,7 +303,7 @@ void handleDeparture()
     cpu->clock = eq_head->time;   //set clock to time of event at head of event queue
 
     cpu->p_link->finishTime = cpu->clock;   //set finish time of process to be departed to current time
-//    pl_head->finishTime = cpu->p_link->finishTime;
+    pl_head->finishTime = cpu->p_link->finishTime;
 
     cpu->p_link->remainingTime = 0.0;    //clear remainingTime
 
@@ -341,7 +341,6 @@ void schedulePreemption()
     preemption->p_link = eq_head->p_link;
 
     popEventQHead();
-
     insertIntoEventQ(preemption);
 }
 
