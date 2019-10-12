@@ -151,7 +151,7 @@ void generate_report();
 float urand();
 float genexp(float);
 
-float cpuEstFinishTime();
+float estimate_fin_time();
 
 void sched_arrival();
 void arrival();
@@ -171,6 +171,13 @@ void sched_q_preempt();
 void q_preempt();
 float get_next_q_dispatch();
 float get_next_q_clock();
+
+float getCpuUtil();
+float getTotalThroughput();
+float getAvgNumProcInQ();
+
+float getAvgTurnaroundTime();
+
 
 //process *getSRTProcess();
 

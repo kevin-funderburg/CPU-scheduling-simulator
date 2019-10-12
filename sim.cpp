@@ -73,14 +73,13 @@ void init()
     eventQ = EventQueue();
     eventQ.push(eq_head);
 }
-
 ////////////////////////////////////////////////////////////////
 void generate_report()
 {
-    float avgTurnaroundTime = totalTurnaroundTime / MAX_PROCESSES;
-    float totalThroughput = MAX_PROCESSES / completionTime;
+    float avgTurnaroundTime = totalTurnaroundTime / (float)MAX_PROCESSES;
+    float totalThroughput = (float)MAX_PROCESSES / completionTime;
     float cpuUtil = cpuBusyTime / completionTime;
-    float avgWaitingTime = totalWaitingTime / MAX_PROCESSES;
+    float avgWaitingTime = totalWaitingTime / (float)MAX_PROCESSES;
     float avgQlength = 1.0/(float)lambda * avgWaitingTime;
     string _scheduler;
     switch (scheduler) {
@@ -105,15 +104,33 @@ void generate_report()
                     << setw(w) << "AvgReadyQ\n"
                     << setfill('-') << setw(w*5) << "\n";
 
+            cout << setfill('-') << setw(w*5) << "\n"
+                 << setfill(' ')
+                 << setw(w/2) << "Scheduler"
+                 << setw(w/2) << "lambda"
+                 << setw(w) << "AvgTurnaround"
+                 << setw(w) << "Throughput"
+                 << setw(w) << "CPU Utilization"
+                 << setw(w) << "AvgReadyQ\n"
+                 << setfill('-') << setw(w*5) << "\n";
+
             xcel << "Scheduler,lambda,AvgTurnaround,Throughput,CPU Utilization,AvgReadyQ\n";
         }
         data << setfill(' ')
              << setw(w/2) << _scheduler
              << setw(w/2) << lambda
-             << setw(w) << avgTurnaroundTime
-             << setw(w) << totalThroughput
-             << setw(w) << cpuUtil
-             << setw(w) << avgQlength << endl;
+             << setw(w) << getAvgTurnaroundTime()
+             << setw(w) << getTotalThroughput()
+             << setw(w) << getCpuUtil()
+             << setw(w) << getAvgNumProcInQ() << endl;
+
+        cout << setfill(' ')
+             << setw(w/2) << _scheduler
+             << setw(w/2) << lambda
+             << setw(w) << getAvgTurnaroundTime()
+             << setw(w) << getTotalThroughput()
+             << setw(w) << getCpuUtil()
+             << setw(w) << getAvgNumProcInQ() << endl;
 
         xcel << _scheduler << ","
              << lambda << ","
@@ -127,11 +144,9 @@ void generate_report()
     }
     else cout << "Unable to open file";
 }
-
 ////////////////////////////////////////////////////////////////
 /// @return a random number between 0 and 1
 float urand() { return (float) rand() / RAND_MAX; }
-
 /////////////////////////////////////////////////////////////
 /// @return a random number that follows an exp distribution
 float genexp(float lambda)
@@ -145,10 +160,17 @@ float genexp(float lambda)
     }
     return(x);
 }
-
+/***
+ * Create new process and schedule an arrival event for the next process
+ */
 void sched_arrival()
 {
-    process *pl_cursor = pl_tail;
+//    process *pl_cursor = pl_tail;
+    process *pl_cursor = pl_head;
+    while (pl_cursor->pl_next != NULL)
+    {
+        pl_cursor = pl_cursor->pl_next;
+    }
     pl_cursor->pl_next = new process;
     pl_cursor->pl_next->pid = pl_cursor->pid + 1;
     pl_cursor->pl_next->arrivalTime = pl_cursor->arrivalTime + genexp((float)lambda);
@@ -158,7 +180,7 @@ void sched_arrival()
     pl_cursor->pl_next->burst = genexp(avgServiceTime);
     pl_cursor->pl_next->remainingTime = pl_cursor->pl_next->burst;
     pl_cursor->pl_next->pl_next = nullptr;
-    pl_tail = pl_tail->pl_next;
+//    pl_tail = pl_tail->pl_next;
 
     event *arrival = new event;
     arrival->type = ARRIVE;
@@ -175,7 +197,7 @@ void sched_arrival()
 void arrival()
 {
     Ready *ready = new Ready;
-    ready->p_link = eventQ.top()->p_link;   //link process at head of event queue
+    ready->p_link = eventQ.top()->p_link;   //link process at head of event queue to ready queue
     ready->rq_next = nullptr;
     readyQ.push(ready);
     eventQ.pop();
@@ -199,7 +221,7 @@ void sched_dispatch()
         else
             nextProc = readyQ.top()->p_link;
     }
-//    else if (scheduler == _RR)
+    else if (scheduler == _RR)
 //        nextProc = getHRRProcess();
 
     dispatch->time = cpu->clock < nextProc->arrivalTime ?
@@ -228,6 +250,8 @@ void dispatch()
         {
             while (rq_cursor != nullptr)
             {
+                //if the ready process arrival time is eqal to the arrival time od
+                //the current dispatch event
                 if (rq_cursor->p_link->arrivalTime == eventQ.top()->p_link->arrivalTime)
                 {
                     rq_precursor->rq_next = rq_cursor->rq_next;
@@ -283,16 +307,20 @@ void sched_depart()
     eventQ.push(departure);
 }
 
-void handleDeparture()
+void departure()
 {
     cpu->clock = eventQ.top()->time;        //set clock to time of event at head of event queue
     cpu->p_link->finishTime = cpu->clock;   //set finish time of process to be departed to current time
     cpu->p_link->remainingTime = 0.0;       //clear remainingTime
 
+    //set metric calculation variables
     cpuBusyTime += cpu->p_link->burst;
     totalTurnaroundTime += (cpu->p_link->finishTime - cpu->p_link->arrivalTime);
+//    cout << "totalTurnaroundTime: " << totalTurnaroundTime << endl;
     completionTime = cpu->p_link->finishTime;
+//    cout << "completionTime: " << completionTime << endl;
     totalWaitingTime += (cpu->p_link->finishTime - cpu->p_link->arrivalTime - cpu->p_link->burst);
+//    cout << "totalWaitingTime: " << totalWaitingTime << endl;
 
     cpu->p_link = nullptr;
     cpu->busy = false;   //CPU Ready for next process
@@ -308,46 +336,49 @@ void handleDeparture()
  * */
 bool does_preempt()
 {
-    float cpuFinishTime = cpuEstFinishTime();
-    float cpuRemainingTime = cpuFinishTime - eventQ.top()->time;
+    float cpu_fin_time = estimate_fin_time();
+    float cpu_remaining_time = cpu_fin_time - eventQ.top()->time;
 
-    return (eventQ.top()->time < cpuFinishTime) && (eventQ.top()->p_link->remainingTime < cpuRemainingTime);
+    return (eventQ.top()->time < cpu_fin_time) && (eventQ.top()->p_link->remainingTime < cpu_remaining_time);
 }
 
+/**
+ * Schedule a preemption event
+ */
 void sched_preempt()
 {
     event *preemption = new event;
     preemption->time = eventQ.top()->time;
     preemption->type = PREEMPT;
     preemption->eq_next = nullptr;
-    preemption->p_link = eventQ.top()->p_link;
+    preemption->p_link = eventQ.top()->p_link;  //attach process at head of event queue to preemption event
 
     eventQ.pop();
     eventQ.push(preemption);
 }
 
-void handlePreemption()
+void preemption()
 {
-    process *preemptedProcPtr = cpu->p_link;
+    process *preempt_process = cpu->p_link;
 
     cpu->p_link->remainingTime =
-            cpuEstFinishTime() - eventQ.top()->time;
+            estimate_fin_time() - eventQ.top()->time;
 
-    cpu->p_link = eventQ.top()->p_link;
-    cpu->clock = eventQ.top()->time;
+    cpu->p_link = eventQ.top()->p_link;     //attach process at event queue to CPU
+    cpu->clock = eventQ.top()->time;        //advance the clock to time of event
     if (cpu->p_link->reStartTime == 0.0)
         cpu->p_link->startTime = eventQ.top()->time;
     else
         cpu->p_link->reStartTime = eventQ.top()->time;
 
-    event *preemptedProcArrival = new event;
-    preemptedProcArrival->time = eventQ.top()->time;
-    preemptedProcArrival->type = ARRIVE;
-    preemptedProcArrival->eq_next = nullptr;
-    preemptedProcArrival->p_link = preemptedProcPtr;
+    event *preempt_arrival = new event;
+    preempt_arrival->time = eventQ.top()->time;     //set time of preemption
+    preempt_arrival->type = ARRIVE;
+    preempt_arrival->eq_next = nullptr;
+    preempt_arrival->p_link = preempt_process;      //link preempted process to preempt arrival event
 
     eventQ.pop();
-    eventQ.push(preemptedProcArrival);
+    eventQ.push(preempt_arrival);
 }
 
 ////////////////////////////////////////////////////////////
@@ -391,7 +422,7 @@ void FCFS()
                 dispatchCount++;
                 break;
             case DEPARTURE:
-                handleDeparture();
+                departure();
                 departureCount++;
                 break;
             default: cerr << "invalid event type\n";
@@ -424,7 +455,7 @@ void SRTF()
                 //If the current event's time occurs after the process
                 //currently on the CPU completes, it won't be preempted so it can
                 //be scheduled normally
-                if (eventQ.top()->time > cpuEstFinishTime())
+                if (eventQ.top()->time > estimate_fin_time())
                     sched_depart();
                 else if (does_preempt())
                     sched_preempt();
@@ -441,11 +472,11 @@ void SRTF()
                 allocationCount++;
                 break;
             case DEPARTURE:
-                handleDeparture();
+                departure();
                 departureCount++;
                 break;
             case PREEMPT:
-                handlePreemption();
+                preemption();
                 break;
             default: cerr << "invalid event type\n";
         }
@@ -518,12 +549,13 @@ void sched_q_dispatch()
 
     if (readyQ.top() != nullptr)
     {
+        //advance clock to arrival time to simulate time progression
         if (readyQ.top()->p_link->arrivalTime < cpu->clock)
             dispatch->time = cpu->clock;
         else
         {
             cpu->clock = readyQ.top()->p_link->arrivalTime;
-
+            //determine the time when the process will be preempted by the quantum
             float nextQuantumTime = quantumClock;
             while (nextQuantumTime < cpu->clock)
                 nextQuantumTime += quantum;
@@ -562,7 +594,7 @@ void sched_q_depart()
     event *departure = new event;
     departure->type = DEPARTURE;
     departure->eq_next = nullptr;
-    departure->p_link = cpu->p_link;
+    departure->p_link = cpu->p_link;    //link cpu process to departure event
 
     if (cpu->p_link->reStartTime == 0)
         departure->time = cpu->p_link->startTime + cpu->p_link->remainingTime;
@@ -574,18 +606,17 @@ void sched_q_depart()
 
 void q_depart()
 {
-    cpu->p_link->finishTime = eventQ.top()->time;
+    cpu->p_link->finishTime = eventQ.top()->time;   //set finish time of processing
     cpu->p_link->remainingTime = 0.0;
-    cpu->clock = eventQ.top()->time;
+    cpu->clock = eventQ.top()->time;    //advance clock
     cpu->busy = false;
-
+    //get metric calculations
     cpuBusyTime += cpu->p_link->burst;
     totalTurnaroundTime += (cpu->p_link->finishTime - cpu->p_link->arrivalTime);
     completionTime = cpu->p_link->finishTime;
     totalWaitingTime += (cpu->p_link->finishTime - cpu->p_link->arrivalTime - cpu->p_link->burst);
 
     cpu->p_link = nullptr;
-
     eventQ.pop();
 }
 
@@ -595,7 +626,7 @@ void sched_q_preempt()
     preemption->type = PREEMPT;
     preemption->eq_next = nullptr;
 
-    cpu->clock = readyQ.top()->p_link->arrivalTime;
+    cpu->clock = readyQ.top()->p_link->arrivalTime; //advance clock
 
     float nextQuantumTime = quantumClock;
     while (nextQuantumTime < cpu->clock)
@@ -609,9 +640,9 @@ void sched_q_preempt()
 
 void q_preempt()
 {
-    process *preemp_pr = cpu->p_link;
+    process *preempted_pr = cpu->p_link;
 
-    cpu->p_link->remainingTime = cpuEstFinishTime() - eventQ.top()->time;
+    cpu->p_link->remainingTime = estimate_fin_time() - eventQ.top()->time;
 
     cpu->p_link = eventQ.top()->p_link;
     cpu->clock = eventQ.top()->time;
@@ -624,15 +655,15 @@ void q_preempt()
 
     quantumClock = nextQuantumTime;
 
-    event *preemptedProcArrival = new event;
-    preemptedProcArrival->time = eventQ.top()->time;
-    preemptedProcArrival->type = ARRIVE;
-    preemptedProcArrival->eq_next = nullptr;
-    preemptedProcArrival->p_link = preemp_pr;
+    event *preempted_p_arrival = new event;
+    preempted_p_arrival->time = eventQ.top()->time;
+    preempted_p_arrival->type = ARRIVE;
+    preempted_p_arrival->eq_next = nullptr;
+    preempted_p_arrival->p_link = preempted_pr;
     
     eventQ.pop();
     readyQ.pop();
-    eventQ.push(preemptedProcArrival);
+    eventQ.push(preempted_p_arrival);
 
 }
 
@@ -647,18 +678,134 @@ float get_next_q_dispatch()
     return nextQuantumTime;
 }
 
-float cpuEstFinishTime()
+float estimate_fin_time()
 {
-    float estFinish;
-    float startTime = cpu->p_link->startTime;
-    float reStartTime = cpu->p_link->reStartTime;
-    float remainingTime = cpu->p_link->remainingTime;
+    float est_fin_time;
+    float start = cpu->p_link->startTime;
+    float reStart = cpu->p_link->reStartTime;
+    float remaining = cpu->p_link->remainingTime;
 
-    estFinish = (reStartTime == 0 ? startTime : reStartTime) + remainingTime;
+    est_fin_time = (reStart == 0 ? start : reStart) + remaining;
 
-    return estFinish;
+    return est_fin_time;
 }
 
+float getAvgTurnaroundTime()
+{
+    float totTurnaroundTime = 0.0;
+    float totalServicetime = 0.0;
+    int count = 0;
+    int count2 = 0;
+    process *pIt = pl_head;
+    while (pIt->pl_next != NULL)
+    {
+
+        if (pIt->finishTime == 0)
+        {
+
+            count2++;
+        }
+        else
+        {
+            totTurnaroundTime += (pIt->finishTime - pIt->arrivalTime);
+            count++;
+        }
+
+        totalServicetime += pIt->burst;
+
+        pIt = pIt->pl_next;
+    }
+    return (totTurnaroundTime / 10000);
+}
+
+float getCpuUtil()
+{
+    process *pIt = pl_head;
+    float busyTime = 0.0;
+    float finTime = 0.0;
+    int count = 0;
+    while (pIt->pl_next != NULL)
+    {
+        if (pIt->finishTime == 0)
+        {
+            count++;
+        }
+        else
+        {
+            busyTime += pIt->burst;
+            finTime = pIt->finishTime;
+        }
+        pIt = pIt->pl_next;
+    }
+    cout << "Busy Time: " << busyTime << endl;
+    cout << "finTime: " << finTime << endl;
+    cout << "number of 0 finish time's in CPU util: " << count << endl;
+    return (busyTime / finTime);
+}
+
+float getTotalThroughput()
+{
+    process *pIt = pl_head;
+    float finTime = 0.0;
+    int count = 0;
+
+    while (pIt->pl_next != NULL)
+    {
+
+        if (pIt->finishTime == 0)
+        {
+            count++;
+        }
+        else
+        {
+            finTime = pIt->finishTime;
+        }
+        pIt = pIt->pl_next;
+    }
+    cout << "totalTime: " << finTime << endl;
+    return ((float)MAX_PROCESSES / finTime);
+}
+
+float getAvgNumProcInQ()
+{
+
+    float timeNmin1 = 0.0;
+    int count = 0;
+    process *pIt = pl_head;
+    while (pIt->pl_next != NULL)
+    {
+        if (pIt->finishTime == 0)
+        {
+            count++;
+        }
+        else
+        {
+            timeNmin1 = pIt->finishTime;
+        }
+        pIt = pIt->pl_next;
+    }
+    int timeN = static_cast<int>(timeNmin1) + 1;
+
+    pIt = pl_head;
+    int time = 0;
+    ;
+    int numProcsInQ = 0;
+    for (time = 0; time < timeN; time++)
+    {
+        while (pIt->finishTime != 0)
+        {
+            if ((pIt->arrivalTime < time && pIt->startTime > time) ||
+                (pIt->arrivalTime > time && pIt->arrivalTime < (time + 1)))
+            {
+                numProcsInQ++;
+            }
+            pIt = pIt->pl_next;
+        }
+        pIt = pl_head;
+    }
+
+    return ((float)numProcsInQ / timeN);
+}
 ///////////////////////////////////////////////////////////////
 int main(int argc, char *argv[] )
 {
