@@ -301,13 +301,8 @@ void departure()
 {
     cpu->clock = eventQ.top()->time;        //set clock to time of event at head of event queue
     cpu->p_link->finishTime = cpu->clock;   //set finish time of process to be departed to current time
-<<<<<<< HEAD
-    pl_head->finishTime = cpu->p_link->finishTime;
 
-    cpu->p_link->remainingTime = 0.0;    //clear remainingTime
-=======
     cpu->p_link->remainingTime = 0.0;       //clear remainingTime
->>>>>>> version2
 
     //set metric calculation variables
     cpuBusyTime += cpu->p_link->burst;
@@ -346,13 +341,8 @@ void sched_preempt()
     preemption->eq_next = nullptr;
     preemption->p_link = eventQ.top()->p_link;  //attach process at head of event queue to preemption event
 
-<<<<<<< HEAD
-    popEventQHead();
-    insertIntoEventQ(preemption);
-=======
     eventQ.pop();
     eventQ.push(preemption);
->>>>>>> version2
 }
 
 void preemption()
