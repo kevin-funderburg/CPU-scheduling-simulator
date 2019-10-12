@@ -1,15 +1,15 @@
-/** \file header.h
-    \brief header file for sim.cpp.
-
-    Authors: Kevin Funderburg, Rob Murray
-*/
+/***
+ * CPU Scheduler Simulation
+ * @file header.h
+ * @authors: Kevin Funderburg, Rob Murray
+ */
 
 #ifndef HEADER_H
 #define HEADER_H
 
 #include "event.h"
-
 using namespace std;
+
 #define MAX_PROCESSES 10000
 
 enum Scheduler {_FCFS = 1, _SRTF = 2, _RR = 3};
@@ -32,31 +32,6 @@ struct CPU
     bool busy;
     struct process *p_link;
 };
-
-//class CPU
-//{ public:
-//    CPU() {
-//        clock = 0.0;
-//        busy = false;
-//        p_link = nullptr;
-//    };
-//    float clock;
-//    bool busy;
-//    struct process *p_link;
-//    float get_est_finish_time();
-//};
-
-//float CPU::get_est_finish_time()
-//{
-//    float est_finish;
-//    float startTime = p_link->startTime;
-//    float reStartTime = p_link->reStartTime;
-//    float remainingTime = p_link->remainingTime;
-//
-//    est_finish = (reStartTime == 0 ? startTime : reStartTime) + remainingTime;
-//
-//    return est_finish;
-//}
 
 struct Ready
 {
@@ -120,7 +95,6 @@ process* ReadyQueue::get_srt()
 
 Scheduler scheduler;
 
-// Global Variables
 float totalTurnaroundTime;
 float completionTime;
 float cpuBusyTime;
@@ -150,7 +124,6 @@ int run_sim();
 void generate_report();
 float urand();
 float genexp(float);
-
 float estimate_fin_time();
 
 void sched_arrival();
@@ -171,16 +144,5 @@ void sched_q_preempt();
 void q_preempt();
 float get_next_q_dispatch();
 float get_next_q_clock();
-
-float getCpuUtil();
-float getTotalThroughput();
-float getAvgNumProcInQ();
-
-float getAvgTurnaroundTime();
-
-
-//process *getSRTProcess();
-
-void popReadyQHead();
 
 #endif //HEADER_H

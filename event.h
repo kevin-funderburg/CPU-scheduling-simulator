@@ -1,4 +1,6 @@
 /**
+ * @file event.h
+ * @author Kevin Funderburg
  * Representation of a event in the system.
  */
 
@@ -15,7 +17,6 @@ struct event
     struct event *eq_next;
     struct process *p_link;
 };
-
 
 class EventQueue
 { public:
